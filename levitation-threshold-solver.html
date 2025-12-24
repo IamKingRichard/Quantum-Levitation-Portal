@@ -276,6 +276,18 @@
         </div>
       </div>
 
+      <!-- NEW: RC1 exclusion gap -->
+      <div class="smallrow">
+        <div>
+          <div class="lbl">gapZ (m) — RC1 exclusion around z0</div>
+          <input id="gapZ" type="number" step="0.0005" value="0.004">
+        </div>
+        <div>
+          <div class="lbl">Tip</div>
+          <div class="note" style="margin:0">Use 0.002–0.006 for ε=0.01–0.02.</div>
+        </div>
+      </div>
+
       <div class="smallrow">
         <div>
           <div class="lbl">κ_min (s⁻²) — stiffness floor</div>
@@ -288,7 +300,7 @@
       </div>
 
       <div class="note">
-        RC1 (directional): enforce <span class="mono">Φ(z&lt;z0) ≥ 1+ε</span> and <span class="mono">Φ(z&gt;z0) ≤ 1−ε</span> over the band.<br>
+        RC1 (directional): enforce <span class="mono">Φ(z&lt;z0-gapZ) ≥ 1+ε</span> and <span class="mono">Φ(z&gt;z0+gapZ) ≤ 1−ε</span> over the band.<br>
         RC2 (monotone): enforce <span class="mono">max Φ'(z) &lt; 0</span> over the band.<br>
         RC3 (stiffness): enforce <span class="mono">min |a'(z)| ≥ κ_min</span> over the band, where <span class="mono">a'(z)=g Φ'(z)</span>.
       </div>
@@ -373,7 +385,7 @@
           <canvas id="trap" width="520" height="520"></canvas>
           <div class="note" style="margin-top:8px">
             Blue: Φ(z). Green dashed: 1±ε thresholds. Orange: z0. <br>
-            Purple: Φ′(z). Red dashed: 0 (must stay &lt;0). Cyan dashed: ±κ_min/g on Φ′ scale.
+            Purple: Φ′(z). Red dashed: 0 (must stay &lt;0). Cyan dashed: ±κ_min/g on Φ′ scale. Grey shade: gapZ region.
           </div>
         </div>
       </div>
@@ -382,50 +394,62 @@
       <div style="margin-top:12px">
         <div class="sub">Time simulation: z(t) with viscous drag and optional ρc modulation</div>
 
+        <!-- UPDATED: add critical damping helper button -->
         <div class="smallrow">
           <div>
             <div class="lbl">Drag c (s⁻¹)</div>
             <input id="dragC" type="number" step="0.1" value="2.0">
           </div>
           <div>
-            <div class="lbl">Initial offset Δz (m)</div>
-            <input id="zKick" type="number" step="0.001" value="0.005">
+            <div class="lbl">Critical damping helper</div>
+            <button id="setCrit" class="secondary" type="button" style="width:100%;min-width:auto">Set c ≈ 2ω₀</button>
           </div>
         </div>
 
         <div class="smallrow">
+          <div>
+            <div class="lbl">Initial offset Δz (m)</div>
+            <input id="zKick" type="number" step="0.001" value="0.005">
+          </div>
           <div>
             <div class="lbl">Duration T (s)</div>
             <input id="simT" type="number" step="0.1" value="8.0">
           </div>
+        </div>
+
+        <div class="smallrow">
           <div>
             <div class="lbl">Time step dt (s)</div>
             <input id="simDt" type="number" step="0.0005" value="0.002">
           </div>
-        </div>
-
-        <div class="smallrow">
           <div>
             <div class="lbl">Drive amp A (fraction; 0.05 = 5%)</div>
             <input id="driveA" type="number" step="0.001" value="0.05">
           </div>
-          <div>
-            <div class="lbl">Drive freq f (Hz)</div>
-            <input id="driveF" type="number" step="0.1" value="1.0">
-          </div>
         </div>
 
         <div class="smallrow">
           <div>
+            <div class="lbl">Drive freq f (Hz)</div>
+            <input id="driveF" type="number" step="0.1" value="1.0">
+          </div>
+          <div>
             <div class="lbl">Drive phase φ (rad)</div>
             <input id="drivePhi" type="number" step="0.1" value="0.0">
           </div>
+        </div>
+
+        <div class="smallrow">
           <div>
             <div class="lbl">Enable drive</div>
             <select id="driveOn">
               <option value="yes" selected>Yes</option>
               <option value="no">No</option>
             </select>
+          </div>
+          <div>
+            <div class="lbl"> </div>
+            <div class="note" style="margin:0">Drive is ρc modulation: a(z,t)=g(1+u(t))Φ(z).</div>
           </div>
         </div>
 
@@ -436,6 +460,12 @@
         <canvas id="sim" width="1560" height="420"></canvas>
         <div class="note">
           Blue: z(t). Orange dashed: z0. Green dashed: z0±Δz band (robust half-width).
+        </div>
+
+        <!-- NEW: sim stats -->
+        <div class="status" id="simStats" style="margin-top:10px">
+          <span class="pill"><span class="dot" id="dotSim"></span> Sim stats</span>
+          <div class="mono" id="simStatsTxt" style="margin-top:8px; white-space:pre-wrap;">—</div>
         </div>
       </div>
     </div>
@@ -454,7 +484,7 @@
   };
 
   // ---------------------------
-  // Disk + Yukawa engineering G
+  // Geometry: disk + Yukawa
   // ---------------------------
   function G(z, R, m){
     const a = Math.max(1e-12, z);
@@ -467,14 +497,12 @@
   function dGdz(z, R, m){
     const a = Math.max(1e-12, z);
     const s = Math.sqrt(z*z + R*R);
-
     const f1p = -m * Math.exp(-m*a);
 
     const expms = Math.exp(-m*s);
-    const uPrime = (R*R) / (s*s*s);
-    const vPrimeFactor = -m * (z/s);
+    const uPrime = (R*R) / (s*s*s);     // d/dz(z/s)
+    const vPrimeFactor = -m * (z/s);    // (1/exp)*d/dz(exp)
     const f2p = expms * (uPrime + (z/s)*vPrimeFactor);
-
     return 0.5*(f1p - f2p);
   }
 
@@ -499,9 +527,12 @@
   function area(x){ return Math.PI * x.R*x.R; }
   function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
 
-  function aOfZ(z, x){ return g * Phi(z, x); }       // m/s^2
+  function aOfZ(z, x){ return g * Phi(z, x); }
   function aPrimeOfZ(z, x){ return g * dPhidz(z, x); } // s^-2
 
+  // ---------------------------
+  // UI state
+  // ---------------------------
   function currentX(){
     return {
       R: parseFloat(el("R").value),
@@ -532,17 +563,19 @@
       enabled: el("rcEnable").value === "yes",
       deltaZ: parseFloat(el("deltaZ").value),
       epsBand: parseFloat(el("epsBand").value),
+      gapZ: parseFloat(el("gapZ")?.value || "0.004"),
       kappaMin: parseFloat(el("kappaMin").value),
       samples: Math.max(11, Math.floor(parseFloat(el("rcSamples").value) || 81))
     };
   }
 
   // ---------------------------
-  // Robust confinement check (corrected RC1 split at z0)
+  // Robust confinement check (RC1 uses gapZ)
   // ---------------------------
   function robustConfinementCheck(x, rb){
     const dz = Math.max(0, rb.deltaZ);
     const eps = Math.max(0, rb.epsBand);
+    const gap = Math.max(0, rb.gapZ || 0);
     const kMin = Math.max(0, rb.kappaMin);
 
     const zLo = Math.max(1e-4, x.z0 - dz);
@@ -554,28 +587,29 @@
     let maxPhiPrime = -Infinity;
     let minAbsAPrime = +Infinity;
 
-    const zTol = 1e-9;
-
     for(let i=0;i<N;i++){
       const z = zLo + (zHi - zLo) * (i/(N-1));
       const phi = Phi(z, x);
       const phip = dPhidz(z, x);
 
-      if (z < x.z0 - zTol) minPhiBelow = Math.min(minPhiBelow, phi);
-      if (z > x.z0 + zTol) maxPhiAbove = Math.max(maxPhiAbove, phi);
+      // RC1 enforced only outside [z0-gap, z0+gap]
+      if (z < x.z0 - gap) minPhiBelow = Math.min(minPhiBelow, phi);
+      if (z > x.z0 + gap) maxPhiAbove = Math.max(maxPhiAbove, phi);
 
+      // RC2: monotone restoring slope
       maxPhiPrime = Math.max(maxPhiPrime, phip);
 
+      // RC3: stiffness floor (a' = g * Phi')
       const apr = g * phip;
       minAbsAPrime = Math.min(minAbsAPrime, Math.abs(apr));
     }
 
     const reasons = [];
     if (minPhiBelow !== +Infinity && !(minPhiBelow >= 1 + eps)){
-      reasons.push(`RC1 fail: min Φ below z0 = ${minPhiBelow.toFixed(4)} < ${(1+eps).toFixed(4)}`);
+      reasons.push(`RC1 fail: min Φ below (outside gap) = ${minPhiBelow.toFixed(4)} < ${(1+eps).toFixed(4)}`);
     }
     if (maxPhiAbove !== -Infinity && !(maxPhiAbove <= 1 - eps)){
-      reasons.push(`RC1 fail: max Φ above z0 = ${maxPhiAbove.toFixed(4)} > ${(1-eps).toFixed(4)}`);
+      reasons.push(`RC1 fail: max Φ above (outside gap) = ${maxPhiAbove.toFixed(4)} > ${(1-eps).toFixed(4)}`);
     }
     if (!(maxPhiPrime < 0)){
       reasons.push(`RC2 fail: max Φ' in band = ${maxPhiPrime.toExponential(3)} (must be < 0)`);
@@ -587,7 +621,7 @@
     return {
       ok: reasons.length === 0,
       reasons,
-      stats: { zLo, zHi, minPhiBelow, maxPhiAbove, maxPhiPrime, minAbsAPrime }
+      stats: { zLo, zHi, minPhiBelow, maxPhiAbove, maxPhiPrime, minAbsAPrime, gap }
     };
   }
 
@@ -831,6 +865,7 @@
     const padL = 64, padR = 24, padT = 24, padB = 38;
     const mid = Math.floor((h - padT - padB) * 0.52) + padT;
 
+    // background grid
     ctx.strokeStyle = "rgba(203,213,225,.12)";
     ctx.lineWidth = 1;
     for(let i=0;i<=6;i++){
@@ -842,11 +877,14 @@
       ctx.beginPath(); ctx.moveTo(xx, padT); ctx.lineTo(xx, h-padB); ctx.stroke();
     }
 
+    // divider
     ctx.strokeStyle = "rgba(203,213,225,.25)";
     ctx.beginPath(); ctx.moveTo(padL, mid); ctx.lineTo(w-padR, mid); ctx.stroke();
 
     const N = Math.max(31, rb.samples);
-    const zs = [], phis = [], phips = [];
+    const zs = [];
+    const phis = [];
+    const phips = [];
     let phiMin = +Infinity, phiMax = -Infinity;
     let phipMin = +Infinity, phipMax = -Infinity;
 
@@ -855,12 +893,14 @@
       const phi = Phi(z, x);
       const phip = dPhidz(z, x);
       zs.push(z); phis.push(phi); phips.push(phip);
+
       phiMin = Math.min(phiMin, phi);
       phiMax = Math.max(phiMax, phi);
       phipMin = Math.min(phipMin, phip);
       phipMax = Math.max(phipMax, phip);
     }
 
+    // Include thresholds in plot range
     const eps = Math.max(0, rb.epsBand);
     phiMin = Math.min(phiMin, 1 - eps);
     phiMax = Math.max(phiMax, 1 + eps);
@@ -869,6 +909,7 @@
     phipMin = Math.min(phipMin, -kPhi, 0);
     phipMax = Math.max(phipMax, +kPhi, 0);
 
+    // Helpers
     const xToPx = (z) => padL + (w-padL-padR) * ((z - zLo) / Math.max(1e-12, (zHi - zLo)));
     const yPhiToPx = (phi) => {
       const topH = (mid - padT) - 10;
@@ -882,6 +923,16 @@
       return (h - padB) - botH * t;
     };
 
+    // NEW: Shade excluded RC1 gap region around z0
+    const gap = Math.max(0, rb.gapZ || 0);
+    if (gap > 0){
+      const xL = xToPx(Math.max(zLo, x.z0 - gap));
+      const xR = xToPx(Math.min(zHi, x.z0 + gap));
+      ctx.fillStyle = "rgba(148,163,184,.10)";
+      ctx.fillRect(xL, padT, Math.max(0, xR - xL), (h - padB - padT));
+    }
+
+    // Threshold lines for Φ: 1±eps
     ctx.setLineDash([6,6]);
     ctx.strokeStyle = "rgba(16,185,129,.85)";
     ctx.lineWidth = 1.5;
@@ -890,6 +941,7 @@
     ctx.beginPath(); ctx.moveTo(padL, yUp); ctx.lineTo(w-padR, yUp); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(padL, yDn); ctx.lineTo(w-padR, yDn); ctx.stroke();
 
+    // Φ': 0 (red) and ±kPhi (cyan)
     ctx.strokeStyle = "rgba(239,68,68,.85)";
     const y0 = yPhipToPx(0);
     ctx.beginPath(); ctx.moveTo(padL, y0); ctx.lineTo(w-padR, y0); ctx.stroke();
@@ -901,6 +953,7 @@
     ctx.beginPath(); ctx.moveTo(padL, yKm); ctx.lineTo(w-padR, yKm); ctx.stroke();
     ctx.setLineDash([]);
 
+    // Φ(z)
     ctx.strokeStyle = "rgba(59,130,246,.95)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -911,6 +964,7 @@
     }
     ctx.stroke();
 
+    // Φ'(z)
     ctx.strokeStyle = "rgba(168,85,247,.95)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -921,11 +975,13 @@
     }
     ctx.stroke();
 
+    // z0 marker
     const xz0 = xToPx(x.z0);
     ctx.strokeStyle="rgba(245,158,11,.95)";
     ctx.lineWidth=1.8;
     ctx.beginPath(); ctx.moveTo(xz0, padT); ctx.lineTo(xz0, h-padB); ctx.stroke();
 
+    // Labels
     ctx.fillStyle = "rgba(203,213,225,.9)";
     ctx.font = "12px system-ui";
     ctx.fillText("z (m)", (padL + (w-padR))/2, h-12);
@@ -934,6 +990,7 @@
     ctx.fillText("Φ(z)", padL, padT+12);
     ctx.fillText("Φ'(z)", padL, mid+22);
 
+    // tick labels
     ctx.fillStyle = "rgba(203,213,225,.75)";
     ctx.font = "11px ui-monospace, monospace";
     ctx.fillText(phiMax.toFixed(3), 8, padT+12);
@@ -941,15 +998,19 @@
     ctx.fillText(phipMax.toExponential(2), 8, mid+18);
     ctx.fillText(phipMin.toExponential(2), 8, h-padB);
 
+    // Mark violations (still shows red/cyan for RC2/RC3; green for RC1 outside gap)
     if (rb.enabled){
       const epsOkLow = 1+eps, epsOkHigh = 1-eps;
       for(let i=0;i<N;i++){
         const z = zs[i];
         const phi = phis[i];
         const phip = phips[i];
-        const bad1 = (z < x.z0 && phi < epsOkLow) || (z > x.z0 && phi > epsOkHigh);
+
+        const outsideGap = (z < x.z0 - gap) || (z > x.z0 + gap);
+        const bad1 = outsideGap && ((z < x.z0 && phi < epsOkLow) || (z > x.z0 && phi > epsOkHigh));
         const bad2 = (phip >= 0);
         const bad3 = (Math.abs(g*phip) < rb.kappaMin);
+
         if (bad1){
           ctx.fillStyle = "rgba(16,185,129,.95)";
           ctx.fillRect(xToPx(z)-2, yPhiToPx(phi)-2, 4, 4);
@@ -963,13 +1024,10 @@
   }
 
   // ---------------------------
-  // Time simulation (RK4, viscous drag + optional modulation)
-  // z¨ = g((1+u(t))Φ(z) - 1) - c z˙
+  // Time simulation (RK4 + viscous drag + optional modulation)
   // ---------------------------
   function simulateTimeSeries(x, rb, c, zKick, T, dt, drive){
-    let z = x.z0 + zKick;
-    let v = 0;
-
+    let z = x.z0 + zKick, v = 0;
     const steps = Math.max(10, Math.floor(T / dt));
     const out = new Array(steps);
 
@@ -980,37 +1038,49 @@
     const twoPiF = 2*Math.PI*f;
 
     const u = (t) => driveOn ? (A * Math.sin(twoPiF*t + phi)) : 0;
+
+    // z¨ = g( (1+u(t))*Phi(z) - 1 ) - c z˙
     const acc = (t, zz, vv) => (g * ((1 + u(t)) * Phi(zz, x) - 1)) - c * vv;
 
     for (let i=0; i<steps; i++){
       const t = i * dt;
       out[i] = { t, z, v, u: u(t) };
 
-      const k1z = v;
-      const k1v = acc(t, z, v);
-
-      const z2 = z + 0.5*dt*k1z;
-      const v2 = v + 0.5*dt*k1v;
-      const k2z = v2;
-      const k2v = acc(t + 0.5*dt, z2, v2);
-
-      const z3 = z + 0.5*dt*k2z;
-      const v3 = v + 0.5*dt*k2v;
-      const k3z = v3;
-      const k3v = acc(t + 0.5*dt, z3, v3);
-
-      const z4 = z + dt*k3z;
-      const v4 = v + dt*k3v;
-      const k4z = v4;
-      const k4v = acc(t + dt, z4, v4);
+      // RK4
+      const k1z = v, k1v = acc(t, z, v);
+      const z2 = z + 0.5*dt*k1z, v2 = v + 0.5*dt*k1v;
+      const k2z = v2, k2v = acc(t + 0.5*dt, z2, v2);
+      const z3 = z + 0.5*dt*k2z, v3 = v + 0.5*dt*k2v;
+      const k3z = v3, k3v = acc(t + 0.5*dt, z3, v3);
+      const z4 = z + dt*k3z, v4 = v + dt*k3v;
+      const k4z = v4, k4v = acc(t + dt, z4, v4);
 
       z += (dt/6) * (k1z + 2*k2z + 2*k3z + k4z);
       v += (dt/6) * (k1v + 2*k2v + 2*k3v + k4v);
 
       if (z < 1e-4){ z = 1e-4; v = 0; }
     }
-
     return out;
+  }
+
+  function computeSimStats(data, x, rb){
+    const dz = Math.max(0, rb.deltaZ);
+    const zLo = x.z0 - dz, zHi = x.z0 + dz;
+
+    let zMin = +Infinity, zMax = -Infinity;
+    let maxAbsDev = 0;
+    let outside = 0;
+
+    for (const p of data){
+      zMin = Math.min(zMin, p.z);
+      zMax = Math.max(zMax, p.z);
+      maxAbsDev = Math.max(maxAbsDev, Math.abs(p.z - x.z0));
+      if (p.z < zLo || p.z > zHi) outside++;
+    }
+
+    const p2p = zMax - zMin;
+    const fracOutside = outside / Math.max(1, data.length);
+    return { zMin, zMax, p2p, maxAbsDev, fracOutside };
   }
 
   function drawSim(ctx, data, x, rb){
@@ -1051,8 +1121,7 @@
     ctx.lineWidth=2;
     ctx.beginPath();
     for (let i=0;i<data.length;i++){
-      const px = xToPx(data[i].t);
-      const py = yToPx(data[i].z);
+      const px = xToPx(data[i].t), py = yToPx(data[i].z);
       i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
     }
     ctx.stroke();
@@ -1061,7 +1130,6 @@
     ctx.fillStyle="rgba(203,213,225,.9)";
     ctx.font="12px system-ui";
     ctx.fillText("t (s)", (padL + w-padR)/2, h-10);
-
     ctx.save();
     ctx.translate(18, (padT + h-padB)/2);
     ctx.rotate(-Math.PI/2);
@@ -1072,16 +1140,21 @@
     ctx.fillText(`z range: [${zMin.toFixed(4)}, ${zMax.toFixed(4)}] | z0=${x.z0.toFixed(4)}`, padL, padT+12);
   }
 
+  function omega0Estimate(x){
+    const ap0 = aPrimeOfZ(x.z0, x);
+    if (!(ap0 < 0)) return NaN;
+    return Math.sqrt(-ap0); // rad/s
+  }
+
   // ---------------------------
   // UI update
   // ---------------------------
   function updateFeasibility(x){
     const C = currentConstraints();
     const rb = currentRobust();
-
     const rc = rb.enabled ? robustConfinementCheck(x, rb) : null;
 
-    const reasons = feasibilityReasons(x, C, rb);
+    const reasons = feasibilityReasons(x,C,rb);
     const ok = reasons.length===0;
 
     el("feasTxt").textContent = ok
@@ -1095,8 +1168,9 @@
       extra =
         `\n\nRobust stats (band):\n` +
         `z∈[${rc.stats.zLo.toFixed(3)}, ${rc.stats.zHi.toFixed(3)}] m\n` +
-        `min Φ below = ${rc.stats.minPhiBelow.toFixed(4)} (≥ ${(1+rb.epsBand).toFixed(4)})\n` +
-        `max Φ above = ${rc.stats.maxPhiAbove.toFixed(4)} (≤ ${(1-rb.epsBand).toFixed(4)})\n` +
+        `gapZ=${rc.stats.gap.toFixed(4)} m\n` +
+        `min Φ below (outside gap) = ${rc.stats.minPhiBelow.toFixed(4)} (≥ ${(1+rb.epsBand).toFixed(4)})\n` +
+        `max Φ above (outside gap) = ${rc.stats.maxPhiAbove.toFixed(4)} (≤ ${(1-rb.epsBand).toFixed(4)})\n` +
         `max Φ' = ${rc.stats.maxPhiPrime.toExponential(3)} (< 0)\n` +
         `min |a'| = ${rc.stats.minAbsAPrime.toFixed(3)} s^-2 (≥ κ_min=${rb.kappaMin.toFixed(3)})`;
     }
@@ -1179,7 +1253,6 @@
     el("dotBest").className = "dot good";
     el("bestTxt").textContent = "FOUND";
 
-    const rb = currentRobust();
     const rbLine = rb.enabled ? `worst-case κ (band)=${best.worstK.toFixed(3)} s^-2\n` : "";
     el("bestMono").textContent =
       `R=${best.R.toFixed(3)} m, h=${best.h.toFixed(4)} m, z0=${best.z0.toFixed(3)} m, m=${best.m.toFixed(3)} 1/m\n` +
@@ -1214,6 +1287,7 @@
     el("rcEnable").value="yes";
     el("deltaZ").value=0.02;
     el("epsBand").value=0.02;
+    el("gapZ").value=0.004;
     el("kappaMin").value=30;
     el("rcSamples").value=81;
 
@@ -1225,7 +1299,6 @@
     el("gridPreset").value="med";
     el("profile").value="uniform";
 
-    // time sim defaults
     el("dragC").value=2.0;
     el("zKick").value=0.005;
     el("simT").value=8.0;
@@ -1235,31 +1308,38 @@
     el("drivePhi").value=0.0;
     el("driveOn").value="yes";
 
-    update();
-
     el("dotBest").className="dot";
     el("bestTxt").textContent="—";
     el("bestMono").textContent="—";
+
+    el("dotSim").className="dot";
+    el("simStatsTxt").textContent="—";
+
+    update();
   }
 
   function applyRobustSuggested(){
     const x = currentX();
-    const ap0 = Math.abs(aPrimeOfZ(x.z0, x));
+    const ap0 = Math.abs(aPrimeOfZ(x.z0, x)); // s^-2
+
     const dz = Math.max(0.005, Math.min(0.02, 0.2*x.z0));
     const kmin = Math.max(10, Math.min(120, 0.6*ap0));
 
     el("deltaZ").value = dz.toFixed(3);
     el("kappaMin").value = Math.round(kmin).toString();
     el("epsBand").value = "0.02";
+    el("gapZ").value = "0.004";
     el("rcEnable").value = "yes";
     update();
   }
 
+  // ---------------------------
   // Wire events
+  // ---------------------------
   const ids = [
     "R","h","z0","m","eta","lam","beta","tau","profile",
     "zClear","Amax","Vmax","Pmax","rhomax","useCaps",
-    "rcEnable","deltaZ","epsBand","kappaMin","rcSamples",
+    "rcEnable","deltaZ","epsBand","gapZ","kappaMin","rcSamples",
     "dragC","zKick","simT","simDt","driveA","driveF","drivePhi","driveOn"
   ];
   ids.forEach(id=>{
@@ -1272,7 +1352,18 @@
   el("reset").addEventListener("click", resetDefaults);
   el("rcAuto").addEventListener("click", applyRobustSuggested);
 
-  // Time sim button (does NOT auto-run on every slider move)
+  // Critical damping helper: set c ≈ 2ω0
+  el("setCrit").addEventListener("click", () => {
+    const x = currentX();
+    const w0 = omega0Estimate(x);
+    if (!Number.isFinite(w0)){
+      alert("No stable ω₀ estimate (a'(z0) is not negative).");
+      return;
+    }
+    const cCrit = 2 * w0;
+    el("dragC").value = cCrit.toFixed(3);
+  });
+
   el("runSim").addEventListener("click", () => {
     const x = currentX();
     const rb = currentRobust();
@@ -1291,6 +1382,16 @@
 
     const data = simulateTimeSeries(x, rb, c, zKick, T, dt, drive);
     drawSim(el("sim").getContext("2d"), data, x, rb);
+
+    const stats = computeSimStats(data, x, rb);
+    const ok = stats.fracOutside < 0.01;
+    el("dotSim").className = "dot " + (ok ? "good" : "warn");
+    el("simStatsTxt").textContent =
+      `z_min=${stats.zMin.toFixed(6)} m\n` +
+      `z_max=${stats.zMax.toFixed(6)} m\n` +
+      `peak-to-peak=${stats.p2p.toFixed(6)} m\n` +
+      `max |z-z0|=${stats.maxAbsDev.toFixed(6)} m\n` +
+      `% time outside band=${(100*stats.fracOutside).toFixed(2)}%`;
   });
 
   update();
