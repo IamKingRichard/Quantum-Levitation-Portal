@@ -97,9 +97,6 @@
       line-height:1.35;
     }
 
-    .vizgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-    @media (max-width: 980px){ .vizgrid{grid-template-columns:1fr} }
-
     .vizgrid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
     @media (max-width: 1120px){ .vizgrid3{grid-template-columns:1fr} }
 
@@ -380,6 +377,67 @@
           </div>
         </div>
       </div>
+
+      <!-- Time simulation block (damping + drive) -->
+      <div style="margin-top:12px">
+        <div class="sub">Time simulation: z(t) with viscous drag and optional ρc modulation</div>
+
+        <div class="smallrow">
+          <div>
+            <div class="lbl">Drag c (s⁻¹)</div>
+            <input id="dragC" type="number" step="0.1" value="2.0">
+          </div>
+          <div>
+            <div class="lbl">Initial offset Δz (m)</div>
+            <input id="zKick" type="number" step="0.001" value="0.005">
+          </div>
+        </div>
+
+        <div class="smallrow">
+          <div>
+            <div class="lbl">Duration T (s)</div>
+            <input id="simT" type="number" step="0.1" value="8.0">
+          </div>
+          <div>
+            <div class="lbl">Time step dt (s)</div>
+            <input id="simDt" type="number" step="0.0005" value="0.002">
+          </div>
+        </div>
+
+        <div class="smallrow">
+          <div>
+            <div class="lbl">Drive amp A (fraction; 0.05 = 5%)</div>
+            <input id="driveA" type="number" step="0.001" value="0.05">
+          </div>
+          <div>
+            <div class="lbl">Drive freq f (Hz)</div>
+            <input id="driveF" type="number" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div class="smallrow">
+          <div>
+            <div class="lbl">Drive phase φ (rad)</div>
+            <input id="drivePhi" type="number" step="0.1" value="0.0">
+          </div>
+          <div>
+            <div class="lbl">Enable drive</div>
+            <select id="driveOn">
+              <option value="yes" selected>Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btnrow">
+          <button id="runSim" class="secondary" type="button">Run time sim</button>
+        </div>
+
+        <canvas id="sim" width="1560" height="420"></canvas>
+        <div class="note">
+          Blue: z(t). Orange dashed: z0. Green dashed: z0±Δz band (robust half-width).
+        </div>
+      </div>
     </div>
   </div>
 
@@ -406,7 +464,6 @@
     return Math.max(1e-15, 0.5*(term1 - term2));
   }
 
-  // Analytic derivative dG/dz
   function dGdz(z, R, m){
     const a = Math.max(1e-12, z);
     const s = Math.sqrt(z*z + R*R);
@@ -442,8 +499,8 @@
   function area(x){ return Math.PI * x.R*x.R; }
   function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
 
-  function aOfZ(z, x){ return g * Phi(z, x); }
-  function aPrimeOfZ(z, x){ return g * dPhidz(z, x); }
+  function aOfZ(z, x){ return g * Phi(z, x); }       // m/s^2
+  function aPrimeOfZ(z, x){ return g * dPhidz(z, x); } // s^-2
 
   function currentX(){
     return {
@@ -481,7 +538,7 @@
   }
 
   // ---------------------------
-  // Robust confinement check (CORRECTED)
+  // Robust confinement check (corrected RC1 split at z0)
   // ---------------------------
   function robustConfinementCheck(x, rb){
     const dz = Math.max(0, rb.deltaZ);
@@ -906,6 +963,116 @@
   }
 
   // ---------------------------
+  // Time simulation (RK4, viscous drag + optional modulation)
+  // z¨ = g((1+u(t))Φ(z) - 1) - c z˙
+  // ---------------------------
+  function simulateTimeSeries(x, rb, c, zKick, T, dt, drive){
+    let z = x.z0 + zKick;
+    let v = 0;
+
+    const steps = Math.max(10, Math.floor(T / dt));
+    const out = new Array(steps);
+
+    const driveOn = !!drive?.on;
+    const A = Math.max(0, drive?.A || 0);
+    const f = Math.max(0, drive?.f || 0);
+    const phi = drive?.phi || 0;
+    const twoPiF = 2*Math.PI*f;
+
+    const u = (t) => driveOn ? (A * Math.sin(twoPiF*t + phi)) : 0;
+    const acc = (t, zz, vv) => (g * ((1 + u(t)) * Phi(zz, x) - 1)) - c * vv;
+
+    for (let i=0; i<steps; i++){
+      const t = i * dt;
+      out[i] = { t, z, v, u: u(t) };
+
+      const k1z = v;
+      const k1v = acc(t, z, v);
+
+      const z2 = z + 0.5*dt*k1z;
+      const v2 = v + 0.5*dt*k1v;
+      const k2z = v2;
+      const k2v = acc(t + 0.5*dt, z2, v2);
+
+      const z3 = z + 0.5*dt*k2z;
+      const v3 = v + 0.5*dt*k2v;
+      const k3z = v3;
+      const k3v = acc(t + 0.5*dt, z3, v3);
+
+      const z4 = z + dt*k3z;
+      const v4 = v + dt*k3v;
+      const k4z = v4;
+      const k4v = acc(t + dt, z4, v4);
+
+      z += (dt/6) * (k1z + 2*k2z + 2*k3z + k4z);
+      v += (dt/6) * (k1v + 2*k2v + 2*k3v + k4v);
+
+      if (z < 1e-4){ z = 1e-4; v = 0; }
+    }
+
+    return out;
+  }
+
+  function drawSim(ctx, data, x, rb){
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    const padL = 70, padR = 20, padT = 18, padB = 38;
+    const tMin = data[0].t, tMax = data[data.length-1].t;
+
+    let zMin = +Infinity, zMax = -Infinity;
+    for (const p of data){ zMin = Math.min(zMin, p.z); zMax = Math.max(zMax, p.z); }
+    const zPad = 0.08 * Math.max(1e-6, (zMax - zMin));
+    zMin -= zPad; zMax += zPad;
+
+    const xToPx = (t) => padL + (w-padL-padR) * ((t - tMin) / Math.max(1e-12, (tMax - tMin)));
+    const yToPx = (z) => (h-padB) - (h-padT-padB) * ((z - zMin) / Math.max(1e-12, (zMax - zMin)));
+
+    ctx.strokeStyle="rgba(203,213,225,.35)";
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(padL,padT); ctx.lineTo(padL,h-padB); ctx.lineTo(w-padR,h-padB);
+    ctx.stroke();
+
+    // z0 and band
+    const dz = Math.max(0, rb.deltaZ);
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle="rgba(245,158,11,.9)";
+    const yZ0 = yToPx(x.z0);
+    ctx.beginPath(); ctx.moveTo(padL,yZ0); ctx.lineTo(w-padR,yZ0); ctx.stroke();
+
+    ctx.strokeStyle="rgba(16,185,129,.75)";
+    ctx.beginPath(); ctx.moveTo(padL,yToPx(x.z0+dz)); ctx.lineTo(w-padR,yToPx(x.z0+dz)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL,yToPx(x.z0-dz)); ctx.lineTo(w-padR,yToPx(x.z0-dz)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // z(t)
+    ctx.strokeStyle="rgba(59,130,246,.95)";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    for (let i=0;i<data.length;i++){
+      const px = xToPx(data[i].t);
+      const py = yToPx(data[i].z);
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle="rgba(203,213,225,.9)";
+    ctx.font="12px system-ui";
+    ctx.fillText("t (s)", (padL + w-padR)/2, h-10);
+
+    ctx.save();
+    ctx.translate(18, (padT + h-padB)/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText("z (m)", 0, 0);
+    ctx.restore();
+
+    ctx.font="12px ui-monospace, monospace";
+    ctx.fillText(`z range: [${zMin.toFixed(4)}, ${zMax.toFixed(4)}] | z0=${x.z0.toFixed(4)}`, padL, padT+12);
+  }
+
+  // ---------------------------
   // UI update
   // ---------------------------
   function updateFeasibility(x){
@@ -1012,6 +1179,7 @@
     el("dotBest").className = "dot good";
     el("bestTxt").textContent = "FOUND";
 
+    const rb = currentRobust();
     const rbLine = rb.enabled ? `worst-case κ (band)=${best.worstK.toFixed(3)} s^-2\n` : "";
     el("bestMono").textContent =
       `R=${best.R.toFixed(3)} m, h=${best.h.toFixed(4)} m, z0=${best.z0.toFixed(3)} m, m=${best.m.toFixed(3)} 1/m\n` +
@@ -1057,6 +1225,16 @@
     el("gridPreset").value="med";
     el("profile").value="uniform";
 
+    // time sim defaults
+    el("dragC").value=2.0;
+    el("zKick").value=0.005;
+    el("simT").value=8.0;
+    el("simDt").value=0.002;
+    el("driveA").value=0.05;
+    el("driveF").value=1.0;
+    el("drivePhi").value=0.0;
+    el("driveOn").value="yes";
+
     update();
 
     el("dotBest").className="dot";
@@ -1067,7 +1245,6 @@
   function applyRobustSuggested(){
     const x = currentX();
     const ap0 = Math.abs(aPrimeOfZ(x.z0, x));
-
     const dz = Math.max(0.005, Math.min(0.02, 0.2*x.z0));
     const kmin = Math.max(10, Math.min(120, 0.6*ap0));
 
@@ -1082,7 +1259,8 @@
   const ids = [
     "R","h","z0","m","eta","lam","beta","tau","profile",
     "zClear","Amax","Vmax","Pmax","rhomax","useCaps",
-    "rcEnable","deltaZ","epsBand","kappaMin","rcSamples"
+    "rcEnable","deltaZ","epsBand","kappaMin","rcSamples",
+    "dragC","zKick","simT","simDt","driveA","driveF","drivePhi","driveOn"
   ];
   ids.forEach(id=>{
     el(id).addEventListener("input", update);
@@ -1093,6 +1271,27 @@
   el("optOnly").addEventListener("click", ()=>runOpt(false));
   el("reset").addEventListener("click", resetDefaults);
   el("rcAuto").addEventListener("click", applyRobustSuggested);
+
+  // Time sim button (does NOT auto-run on every slider move)
+  el("runSim").addEventListener("click", () => {
+    const x = currentX();
+    const rb = currentRobust();
+
+    const c = Math.max(0, parseFloat(el("dragC").value) || 0);
+    const zKick = parseFloat(el("zKick").value) || 0;
+    const T = Math.max(0.1, parseFloat(el("simT").value) || 5);
+    const dt = Math.max(1e-4, parseFloat(el("simDt").value) || 0.002);
+
+    const drive = {
+      on: (el("driveOn")?.value || "no") === "yes",
+      A: parseFloat(el("driveA")?.value || "0"),
+      f: parseFloat(el("driveF")?.value || "0"),
+      phi: parseFloat(el("drivePhi")?.value || "0"),
+    };
+
+    const data = simulateTimeSeries(x, rb, c, zKick, T, dt, drive);
+    drawSim(el("sim").getContext("2d"), data, x, rb);
+  });
 
   update();
 })();
