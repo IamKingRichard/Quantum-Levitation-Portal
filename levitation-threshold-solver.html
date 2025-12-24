@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Levitation Threshold + Constraints + Confinement Optimizer (Disk + Yukawa)</title>
+  <title>Levitation Threshold + Robust Confinement + Constrained Optimization (Disk + Yukawa)</title>
   <style>
     :root{
-      --bg:#0b1220; --panel:#111c33; --panel2:#0f172a; --text:#cbd5e1; --muted:#94a3b8;
+      --bg:#0b1220; --panel:#111c33; --text:#cbd5e1; --muted:#94a3b8;
       --accent:#3b82f6; --good:#10b981; --warn:#f59e0b; --bad:#ef4444; --line:#23304a;
     }
     *{box-sizing:border-box}
@@ -18,15 +18,9 @@
     }
     h1{margin:0 0 10px; font-size:18px; font-weight:700}
     .sub{color:var(--muted); font-size:12px; margin-bottom:12px; line-height:1.35}
-    .grid{
-      display:grid;
-      grid-template-columns: 420px 1fr;
-      gap:12px;
-      align-items:start;
-    }
-    @media (max-width: 980px){
-      .grid{grid-template-columns: 1fr}
-    }
+    .grid{display:grid; grid-template-columns: 420px 1fr; gap:12px; align-items:start;}
+    @media (max-width: 980px){ .grid{grid-template-columns: 1fr} }
+
     .card{
       background:rgba(17,28,51,.9);
       border:1px solid var(--line);
@@ -58,12 +52,8 @@
       outline:none;
     }
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
-    .kpis{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-      margin-top:10px;
-    }
+
+    .kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
     .kpi{
       border:1px dashed rgba(148,163,184,.35);
       border-radius:12px;
@@ -72,6 +62,7 @@
     }
     .kpi small{display:block; color:var(--muted); margin-bottom:6px}
     .kpi .v{font-size:13px; font-weight:700}
+
     .btnrow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
     button{
       border:1px solid rgba(59,130,246,.35);
@@ -94,10 +85,8 @@
       border:1px solid rgba(239,68,68,.35);
       background:linear-gradient(135deg,#b91c1c,#ef4444);
     }
-    .note{
-      font-size:12px; color:var(--muted);
-      margin-top:10px; line-height:1.35;
-    }
+
+    .note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.35;}
     .status{
       margin-top:10px;
       padding:10px;
@@ -107,19 +96,13 @@
       font-size:12px;
       line-height:1.35;
     }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(15,23,42,.35);
-      font-size:12px;
-      color:var(--muted);
-    }
-    .dot{width:9px;height:9px;border-radius:999px;background:var(--muted)}
-    .dot.good{background:var(--good)}
-    .dot.bad{background:var(--bad)}
-    .dot.warn{background:var(--warn)}
+
+    .vizgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+    @media (max-width: 980px){ .vizgrid{grid-template-columns:1fr} }
+
+    .vizgrid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+    @media (max-width: 1120px){ .vizgrid3{grid-template-columns:1fr} }
+
     canvas{
       width:100%;
       height:auto;
@@ -127,30 +110,29 @@
       border:1px solid var(--line);
       background:rgba(15,23,42,.35);
     }
-    .vizgrid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-    }
-    @media (max-width: 980px){
-      .vizgrid{grid-template-columns:1fr}
-    }
+
     .tight{margin-top:6px}
-    .smallrow{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-      margin-top:6px;
+    .smallrow{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:6px;}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid var(--line); background:rgba(15,23,42,.35);
+      font-size:12px; color:var(--muted);
     }
+    .dot{width:9px;height:9px;border-radius:999px;background:var(--muted)}
+    .dot.good{background:var(--good)}
+    .dot.bad{background:var(--bad)}
+    .dot.warn{background:var(--warn)}
+    .kbd{padding:2px 6px;border:1px solid var(--line);border-radius:8px;background:rgba(15,23,42,.4);font-family:ui-monospace,monospace}
   </style>
 </head>
 <body>
-  <h1>Finite Disk + Yukawa: Threshold, Constraints, and Confinement Optimizer</h1>
+  <h1>Finite Disk + Yukawa: Threshold, Robust Confinement, and Constrained Minimization</h1>
   <div class="sub">
-    Model: <span class="mono">(∇² − m²)χ = −λ ρc</span>, on-axis disk approximation, and
-    <span class="mono">a_z = β η ∂zχ</span>.
-    Passive stability requires <span class="mono">a'(z0)&lt;0</span> and then
-    <span class="mono">ω0=√(−a'(z0))</span>, <span class="mono">f0=ω0/(2π)</span>.
+    We normalize the source so <span class="mono">a(z0)=g</span>. Then
+    <span class="mono">a(z)/g = Φ(z) = G(z)/G(z0)</span> and
+    <span class="mono">a'(z) = g Φ'(z)</span>.
+    Robust confinement gates are <span class="kbd">directional</span> (RC1), <span class="kbd">monotone</span> (RC2), and <span class="kbd">stiffness</span> (RC3).
   </div>
 
   <div class="grid">
@@ -211,7 +193,7 @@
 
       <div class="kpis">
         <div class="kpi">
-          <small>Geometry factor G(z₀,R,m)</small>
+          <small>G(z₀,R,m)</small>
           <div class="mono v" id="G_v">—</div>
         </div>
         <div class="kpi">
@@ -219,33 +201,18 @@
           <div class="mono v" id="rho_v">—</div>
         </div>
         <div class="kpi">
-          <small>Pin ≈ ρc V / τ (W)</small>
-          <div class="mono v" id="P_v">—</div>
-        </div>
-        <div class="kpi">
           <small>V = πR²h (m³)</small>
           <div class="mono v" id="V_v">—</div>
         </div>
-
         <div class="kpi">
-          <small>a'(z₀) (s⁻²)</small>
-          <div class="mono v" id="ap_v">—</div>
+          <small>Pin ≈ ρc V / τ (W)</small>
+          <div class="mono v" id="P_v">—</div>
         </div>
-        <div class="kpi">
-          <small>f₀ (Hz), T₀ (s)</small>
-          <div class="mono v" id="fT_v">—</div>
-        </div>
-      </div>
-
-      <div class="note">
-        Threshold uses <span class="mono">g = β η (λ ρc h G)</span> so
-        <span class="mono">ρc,req = g / (β η λ h G)</span>.
-        With ρc set to ρc,req, confinement is <span class="mono">a'(z0)=g·G'(z0)/G(z0)</span>.
       </div>
 
       <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
 
-      <h2>2) Constraints</h2>
+      <h2>2) Baseline constraints</h2>
 
       <div class="smallrow">
         <div>
@@ -283,6 +250,52 @@
         </div>
       </div>
 
+      <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
+
+      <h2>3) Robust confinement (Trap hardening)</h2>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">Enable robust gate</div>
+          <select id="rcEnable">
+            <option value="yes" selected>Yes (hard feasibility)</option>
+            <option value="no">No (ignore trap hardening)</option>
+          </select>
+        </div>
+        <div>
+          <div class="lbl">Band samples (N)</div>
+          <input id="rcSamples" type="number" step="1" value="81">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">Δz (m) — capture half-width</div>
+          <input id="deltaZ" type="number" step="0.001" value="0.02">
+        </div>
+        <div>
+          <div class="lbl">ε — directional margin</div>
+          <input id="epsBand" type="number" step="0.001" value="0.02">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">κ_min (s⁻²) — stiffness floor</div>
+          <input id="kappaMin" type="number" step="1" value="30">
+        </div>
+        <div>
+          <div class="lbl">Auto-set for current config</div>
+          <button id="rcAuto" class="secondary" type="button" style="min-width:auto">Apply suggested</button>
+        </div>
+      </div>
+
+      <div class="note">
+        RC1 (directional): enforce <span class="mono">Φ(z&lt;z0) ≥ 1+ε</span> and <span class="mono">Φ(z&gt;z0) ≤ 1−ε</span> over the band.<br>
+        RC2 (monotone): enforce <span class="mono">max Φ'(z) &lt; 0</span> over the band.<br>
+        RC3 (stiffness): enforce <span class="mono">min |a'(z)| ≥ κ_min</span> over the band, where <span class="mono">a'(z)=g Φ'(z)</span>.
+      </div>
+
       <div class="status" id="feas">
         <span class="pill"><span class="dot" id="dotFeas"></span> Feasibility: <span id="feasTxt">—</span></span>
         <div class="mono" id="whyTxt" style="margin-top:8px; white-space:pre-wrap;">—</div>
@@ -290,15 +303,15 @@
 
       <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
 
-      <h2>3) Constrained optimization</h2>
+      <h2>4) Constrained optimization</h2>
 
       <div class="smallrow">
         <div>
           <div class="lbl">Objective</div>
           <select id="obj">
-            <option value="maxConf" selected>Maximize confinement (most negative a'(z0))</option>
-            <option value="minPin">Minimize Pin</option>
+            <option value="minPin" selected>Minimize Pin</option>
             <option value="minRho">Minimize ρc,req</option>
+            <option value="maxTrapWorst">Maximize worst-case stiffness (band)</option>
             <option value="weighted">Weighted log objective</option>
           </select>
         </div>
@@ -348,20 +361,24 @@
 
     <!-- RIGHT -->
     <div class="card">
-      <h2>4) Visualizations</h2>
-      <div class="vizgrid">
+      <h2>5) Visualizations</h2>
+      <div class="vizgrid3">
         <div>
           <div class="sub">Coherence density map ρc(x,y) (normalized profile)</div>
-          <canvas id="map" width="620" height="620"></canvas>
+          <canvas id="map" width="520" height="520"></canvas>
         </div>
         <div>
-          <div class="sub">On-axis curve: a_z(z) using current ρc,req (scaled)</div>
-          <canvas id="plot" width="620" height="620"></canvas>
+          <div class="sub">On-axis: a(z) with ρc set so a(z0)=g</div>
+          <canvas id="plot" width="520" height="520"></canvas>
         </div>
-      </div>
-      <div class="note">
-        Right plot uses <span class="mono">a_z(z)=β η λ ρc h G(z,R,m)</span> with ρc set to ρc,req at z=z₀, so the curve
-        shows how quickly the effect decays away from the chosen standoff.
+        <div>
+          <div class="sub">Trap diagnostics across band: Φ(z) and Φ′(z)</div>
+          <canvas id="trap" width="520" height="520"></canvas>
+          <div class="note" style="margin-top:8px">
+            Blue: Φ(z). Green dashed: 1±ε thresholds. Orange: z0. <br>
+            Purple: Φ′(z). Red dashed: 0 (must stay &lt;0). Cyan dashed: ±κ_min/g on Φ′ scale.
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -374,34 +391,42 @@
   const fmt = (x, n=4) => (Number.isFinite(x) ? x.toFixed(n) : "—");
   const fmtAuto = (x) => {
     if(!Number.isFinite(x)) return "—";
-    if (Math.abs(x) < 1e6) return x.toFixed(6);
+    if (Math.abs(x) < 1e6) return x.toFixed(4);
     return x.toExponential(3);
   };
 
-  // Disk-Yukawa geometry factor:
-  // G(z) = 0.5*( e^{-m z} - (z/b) e^{-m b} ), b = sqrt(z^2 + R^2)
+  // ---------------------------
+  // Disk + Yukawa engineering G
+  // ---------------------------
   function G(z, R, m){
     const a = Math.max(1e-12, z);
-    const b = Math.sqrt(z*z + R*R);
+    const s = Math.sqrt(z*z + R*R);
     const term1 = Math.exp(-m*a);
-    const term2 = (z/b)*Math.exp(-m*b);
+    const term2 = (z/s) * Math.exp(-m*s);
     return Math.max(1e-15, 0.5*(term1 - term2));
   }
 
-  // Analytic derivative dG/dz for the same approximation:
-  // d/dz[(z/b)e^{-mb}] = e^{-mb}*( R^2/b^3 - m z^2/b^2 )
-  // so dG/dz = 0.5*( -m e^{-mz} - e^{-mb}*( R^2/b^3 - m z^2/b^2 ) )
+  // Analytic derivative dG/dz
   function dGdz(z, R, m){
     const a = Math.max(1e-12, z);
-    const b = Math.sqrt(z*z + R*R);
-    const emz = Math.exp(-m*a);
-    const emb = Math.exp(-m*b);
-    const term = (R*R)/(b*b*b) - (m*z*z)/(b*b);
-    const dterm1 = -m * emz;
-    const dterm2 = emb * term;
-    return 0.5*(dterm1 - dterm2);
+    const s = Math.sqrt(z*z + R*R);
+
+    const f1p = -m * Math.exp(-m*a);
+
+    const expms = Math.exp(-m*s);
+    const uPrime = (R*R) / (s*s*s);
+    const vPrimeFactor = -m * (z/s);
+    const f2p = expms * (uPrime + (z/s)*vPrimeFactor);
+
+    return 0.5*(f1p - f2p);
   }
 
+  function Phi(z, x){ return G(z, x.R, x.m) / G(x.z0, x.R, x.m); }
+  function dPhidz(z, x){ return dGdz(z, x.R, x.m) / G(x.z0, x.R, x.m); }
+
+  // ---------------------------
+  // Threshold & resources
+  // ---------------------------
   function rhoReq(x){
     const GG = G(x.z0, x.R, x.m);
     const denom =
@@ -417,21 +442,8 @@
   function area(x){ return Math.PI * x.R*x.R; }
   function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
 
-  // With rho set to rhoReq (so a(z0)=g), the slope is:
-  // a'(z0) = g * (G'(z0)/G(z0))
-  function aPrimeAtZ0(x){
-    const GG = G(x.z0, x.R, x.m);
-    const dG = dGdz(x.z0, x.R, x.m);
-    return g * (dG / Math.max(1e-15, GG));
-  }
-
-  function f0FromAprime(ap){
-    if (!(ap < 0)) return {f: NaN, T: NaN};
-    const w0 = Math.sqrt(-ap);
-    const f0 = w0/(2*Math.PI);
-    const T0 = 1/Math.max(1e-15,f0);
-    return {f:f0, T:T0};
-  }
+  function aOfZ(z, x){ return g * Phi(z, x); }
+  function aPrimeOfZ(z, x){ return g * dPhidz(z, x); }
 
   function currentX(){
     return {
@@ -458,8 +470,90 @@
     };
   }
 
-  function feasibilityReasons(x, C){
+  function currentRobust(){
+    return {
+      enabled: el("rcEnable").value === "yes",
+      deltaZ: parseFloat(el("deltaZ").value),
+      epsBand: parseFloat(el("epsBand").value),
+      kappaMin: parseFloat(el("kappaMin").value),
+      samples: Math.max(11, Math.floor(parseFloat(el("rcSamples").value) || 81))
+    };
+  }
+
+  // ---------------------------
+  // Robust confinement check (CORRECTED)
+  // ---------------------------
+  function robustConfinementCheck(x, rb){
+    const dz = Math.max(0, rb.deltaZ);
+    const eps = Math.max(0, rb.epsBand);
+    const kMin = Math.max(0, rb.kappaMin);
+
+    const zLo = Math.max(1e-4, x.z0 - dz);
+    const zHi = x.z0 + dz;
+    const N = rb.samples;
+
+    let minPhiBelow = +Infinity;
+    let maxPhiAbove = -Infinity;
+    let maxPhiPrime = -Infinity;
+    let minAbsAPrime = +Infinity;
+
+    const zTol = 1e-9;
+
+    for(let i=0;i<N;i++){
+      const z = zLo + (zHi - zLo) * (i/(N-1));
+      const phi = Phi(z, x);
+      const phip = dPhidz(z, x);
+
+      if (z < x.z0 - zTol) minPhiBelow = Math.min(minPhiBelow, phi);
+      if (z > x.z0 + zTol) maxPhiAbove = Math.max(maxPhiAbove, phi);
+
+      maxPhiPrime = Math.max(maxPhiPrime, phip);
+
+      const apr = g * phip;
+      minAbsAPrime = Math.min(minAbsAPrime, Math.abs(apr));
+    }
+
     const reasons = [];
+    if (minPhiBelow !== +Infinity && !(minPhiBelow >= 1 + eps)){
+      reasons.push(`RC1 fail: min Φ below z0 = ${minPhiBelow.toFixed(4)} < ${(1+eps).toFixed(4)}`);
+    }
+    if (maxPhiAbove !== -Infinity && !(maxPhiAbove <= 1 - eps)){
+      reasons.push(`RC1 fail: max Φ above z0 = ${maxPhiAbove.toFixed(4)} > ${(1-eps).toFixed(4)}`);
+    }
+    if (!(maxPhiPrime < 0)){
+      reasons.push(`RC2 fail: max Φ' in band = ${maxPhiPrime.toExponential(3)} (must be < 0)`);
+    }
+    if (!(minAbsAPrime >= kMin)){
+      reasons.push(`RC3 fail: min |a'(z)| in band = ${minAbsAPrime.toFixed(3)} < κ_min=${kMin.toFixed(3)} s^-2`);
+    }
+
+    return {
+      ok: reasons.length === 0,
+      reasons,
+      stats: { zLo, zHi, minPhiBelow, maxPhiAbove, maxPhiPrime, minAbsAPrime }
+    };
+  }
+
+  function worstCaseStiffness(x, rb){
+    const dz = Math.max(0, rb.deltaZ);
+    const zLo = Math.max(1e-4, x.z0 - dz);
+    const zHi = x.z0 + dz;
+    const N = rb.samples;
+
+    let worst = +Infinity;
+    for(let i=0;i<N;i++){
+      const z = zLo + (zHi - zLo) * (i/(N-1));
+      worst = Math.min(worst, Math.abs(aPrimeOfZ(z, x)));
+    }
+    return worst;
+  }
+
+  // ---------------------------
+  // Feasibility + objectives
+  // ---------------------------
+  function feasibilityReasons(x, C, rb){
+    const reasons = [];
+
     if (x.z0 < C.zClear) reasons.push(`z0 < z_clear  (${x.z0.toFixed(3)} < ${C.zClear.toFixed(3)})`);
 
     const A = area(x);
@@ -475,35 +569,32 @@
     const GG = G(x.z0, x.R, x.m);
     if (!(GG > 0)) reasons.push(`G(z0,R,m) is nonpositive (check m,z0,R)`);
 
-    // Passive stability constraint:
-    const ap = aPrimeAtZ0(x);
-    if (!(ap < 0)) reasons.push(`Passive stability fails: a'(z0) ≥ 0  (a'=${ap.toExponential(3)} s^-2)`);
+    if (rb.enabled){
+      const rc = robustConfinementCheck(x, rb);
+      if (!rc.ok) reasons.push(...rc.reasons);
+    }
 
     return reasons;
   }
 
-  function isFeasible(x, C){
-    return feasibilityReasons(x,C).length === 0;
-  }
+  function isFeasible(x, C, rb){ return feasibilityReasons(x, C, rb).length === 0; }
 
-  function objective(x, kind, weights){
+  function objective(x, kind, weights, rb){
     const rho = rhoReq(x);
     const P = rho * volume(x) / Math.max(1e-15,x.tau);
     const V = volume(x);
-    const ap = aPrimeAtZ0(x);
 
-    if (kind === "maxConf") {
-      // We want "most negative a'(z0)" => minimize a'(z0) directly.
-      // (Feasibility already enforces a'(z0)<0)
-      return ap;
-    }
     if (kind === "minPin") return P;
     if (kind === "minRho") return rho;
+    if (kind === "maxTrapWorst") return -worstCaseStiffness(x, rb);
 
     const wP = weights.wP, wR = weights.wR, wV = weights.wV;
     return wP*Math.log(Math.max(1e-30,P)) + wR*Math.log(Math.max(1e-30,rho)) + wV*Math.log(Math.max(1e-30,V));
   }
 
+  // ---------------------------
+  // Optimizer (grid + random)
+  // ---------------------------
   function linspace(a,b,n){
     if(n<=1) return [a];
     const out = [];
@@ -515,10 +606,10 @@
   function gridSettings(preset){
     if(preset==="fast") return {gridR:26, gridZ:26, gridM:18, gridH:14};
     if(preset==="deep") return {gridR:60, gridZ:60, gridM:40, gridH:24};
-    return {gridR:40, gridZ:40, gridM:30, gridH:20}; // med
+    return {gridR:40, gridZ:40, gridM:30, gridH:20};
   }
 
-  function constrainedMinimize(bounds, C, objectiveType, weights, preset, randIters){
+  function constrainedMinimize(bounds, C, rb, objectiveType, weights, preset, randIters){
     const gset = gridSettings(preset);
     let best = null;
     let bestJ = Infinity;
@@ -533,25 +624,15 @@
         if (z0 < C.zClear) continue;
         for (const m of ms){
           for (const h of hs){
-            const x = {
-              R, z0, m, h,
-              eta: bounds.etaFixed,
-              lam: bounds.lamFixed,
-              beta: bounds.betaFixed,
-              tau: bounds.tauFixed
-            };
-            if (!isFeasible(x,C)) continue;
-            const J = objective(x, objectiveType, weights);
-            if (J < bestJ){
-              bestJ = J;
-              best = {...x};
-            }
+            const x = { R, z0, m, h, eta: bounds.etaFixed, lam: bounds.lamFixed, beta: bounds.betaFixed, tau: bounds.tauFixed };
+            if (!isFeasible(x,C,rb)) continue;
+            const J = objective(x, objectiveType, weights, rb);
+            if (J < bestJ){ bestJ = J; best = {...x}; }
           }
         }
       }
     }
 
-    // Random refine
     const iters = Math.max(0, Math.floor(randIters));
     for (let i=0;i<iters;i++){
       const x = {
@@ -559,36 +640,29 @@
         z0: randUniform(Math.max(bounds.z0min, C.zClear), bounds.z0max),
         m:  randUniform(bounds.mmin, bounds.mmax),
         h:  randUniform(bounds.hmin, bounds.hmax),
-        eta: bounds.etaFixed,
-        lam: bounds.lamFixed,
-        beta: bounds.betaFixed,
-        tau: bounds.tauFixed
+        eta: bounds.etaFixed, lam: bounds.lamFixed, beta: bounds.betaFixed, tau: bounds.tauFixed
       };
-      if (!isFeasible(x,C)) continue;
-      const J = objective(x, objectiveType, weights);
-      if (J < bestJ){
-        bestJ = J;
-        best = {...x};
-      }
+      if (!isFeasible(x,C,rb)) continue;
+      const J = objective(x, objectiveType, weights, rb);
+      if (J < bestJ){ bestJ = J; best = {...x}; }
     }
 
     if (best){
       best.G = G(best.z0,best.R,best.m);
-      best.dG = dGdz(best.z0,best.R,best.m);
-      best.ap = aPrimeAtZ0(best);
-      const fT = f0FromAprime(best.ap);
-      best.f0 = fT.f;
-      best.T0 = fT.T;
       best.rho = rhoReq(best);
       best.V = volume(best);
       best.A = area(best);
       best.P = pin(best);
+      best.ap0 = aPrimeOfZ(best.z0, best);
+      best.worstK = rb.enabled ? worstCaseStiffness(best, rb) : NaN;
       best.J = bestJ;
-      best.conf = -best.ap; // larger = stiffer trap
     }
     return best;
   }
 
+  // ---------------------------
+  // Visuals
+  // ---------------------------
   function drawMap(ctx, Rm, profile){
     const w = ctx.canvas.width, h = ctx.canvas.height;
     const img = ctx.createImageData(w,h);
@@ -610,10 +684,7 @@
         }
         const i = (y*w + x)*4;
         const c = Math.floor(255*val);
-        img.data[i+0]=c;
-        img.data[i+1]=c;
-        img.data[i+2]=c;
-        img.data[i+3]=255;
+        img.data[i+0]=c; img.data[i+1]=c; img.data[i+2]=c; img.data[i+3]=255;
       }
     }
     ctx.putImageData(img,0,0);
@@ -626,7 +697,7 @@
     ctx.stroke();
   }
 
-  function drawPlot(ctx, x){
+  function drawPlotA(ctx, x){
     const w = ctx.canvas.width, h = ctx.canvas.height;
     ctx.clearRect(0,0,w,h);
 
@@ -640,14 +711,11 @@
     const zMin = 0.01;
     const N = 240;
 
-    const rho = rhoReq(x);
     let vmax = 0;
     const vals = [];
     for(let i=0;i<N;i++){
       const z = zMin + (zMax-zMin)*(i/(N-1));
-      const GG = G(z, x.R, x.m);
-      const dzchi = x.lam * rho * x.h * GG;
-      const az = x.beta * x.eta * dzchi;
+      const az = aOfZ(z, x);
       vmax = Math.max(vmax, az);
       vals.push({z,az});
     }
@@ -686,27 +754,195 @@
     ctx.save();
     ctx.translate(18,h/2);
     ctx.rotate(-Math.PI/2);
-    ctx.fillText("a_z(z) (scaled)", 0, 0);
+    ctx.fillText("a(z) (scaled)", 0, 0);
     ctx.restore();
 
     ctx.font="12px ui-monospace, monospace";
     ctx.fillStyle="rgba(203,213,225,.9)";
-    ctx.fillText(`max a_z ≈ ${vmax.toExponential(2)} m/s²`, 70, 44);
+    const ap0 = aPrimeOfZ(x.z0, x);
+    ctx.fillText(`a'(z0) ≈ ${ap0.toFixed(3)} s^-2`, 70, 44);
   }
 
+  function drawTrapDiagnostics(ctx, x, rb){
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    const dz = Math.max(0, rb.deltaZ);
+    const zLo = Math.max(1e-4, x.z0 - dz);
+    const zHi = x.z0 + dz;
+
+    const padL = 64, padR = 24, padT = 24, padB = 38;
+    const mid = Math.floor((h - padT - padB) * 0.52) + padT;
+
+    ctx.strokeStyle = "rgba(203,213,225,.12)";
+    ctx.lineWidth = 1;
+    for(let i=0;i<=6;i++){
+      const yy = padT + (h-padT-padB) * i/6;
+      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(w-padR, yy); ctx.stroke();
+    }
+    for(let i=0;i<=6;i++){
+      const xx = padL + (w-padL-padR) * i/6;
+      ctx.beginPath(); ctx.moveTo(xx, padT); ctx.lineTo(xx, h-padB); ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(203,213,225,.25)";
+    ctx.beginPath(); ctx.moveTo(padL, mid); ctx.lineTo(w-padR, mid); ctx.stroke();
+
+    const N = Math.max(31, rb.samples);
+    const zs = [], phis = [], phips = [];
+    let phiMin = +Infinity, phiMax = -Infinity;
+    let phipMin = +Infinity, phipMax = -Infinity;
+
+    for(let i=0;i<N;i++){
+      const z = zLo + (zHi - zLo) * (i/(N-1));
+      const phi = Phi(z, x);
+      const phip = dPhidz(z, x);
+      zs.push(z); phis.push(phi); phips.push(phip);
+      phiMin = Math.min(phiMin, phi);
+      phiMax = Math.max(phiMax, phi);
+      phipMin = Math.min(phipMin, phip);
+      phipMax = Math.max(phipMax, phip);
+    }
+
+    const eps = Math.max(0, rb.epsBand);
+    phiMin = Math.min(phiMin, 1 - eps);
+    phiMax = Math.max(phiMax, 1 + eps);
+
+    const kPhi = (Math.max(0, rb.kappaMin) / g);
+    phipMin = Math.min(phipMin, -kPhi, 0);
+    phipMax = Math.max(phipMax, +kPhi, 0);
+
+    const xToPx = (z) => padL + (w-padL-padR) * ((z - zLo) / Math.max(1e-12, (zHi - zLo)));
+    const yPhiToPx = (phi) => {
+      const topH = (mid - padT) - 10;
+      const t = (phi - phiMin) / Math.max(1e-12, (phiMax - phiMin));
+      return (mid - 10) - topH * t;
+    };
+    const yPhipToPx = (phip) => {
+      const botTop = mid + 10;
+      const botH = (h - padB) - botTop;
+      const t = (phip - phipMin) / Math.max(1e-12, (phipMax - phipMin));
+      return (h - padB) - botH * t;
+    };
+
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle = "rgba(16,185,129,.85)";
+    ctx.lineWidth = 1.5;
+    const yUp = yPhiToPx(1+eps);
+    const yDn = yPhiToPx(1-eps);
+    ctx.beginPath(); ctx.moveTo(padL, yUp); ctx.lineTo(w-padR, yUp); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL, yDn); ctx.lineTo(w-padR, yDn); ctx.stroke();
+
+    ctx.strokeStyle = "rgba(239,68,68,.85)";
+    const y0 = yPhipToPx(0);
+    ctx.beginPath(); ctx.moveTo(padL, y0); ctx.lineTo(w-padR, y0); ctx.stroke();
+
+    ctx.strokeStyle = "rgba(34,211,238,.85)";
+    const yKp = yPhipToPx(+kPhi);
+    const yKm = yPhipToPx(-kPhi);
+    ctx.beginPath(); ctx.moveTo(padL, yKp); ctx.lineTo(w-padR, yKp); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL, yKm); ctx.lineTo(w-padR, yKm); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = "rgba(59,130,246,.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<N;i++){
+      const px = xToPx(zs[i]);
+      const py = yPhiToPx(phis[i]);
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(168,85,247,.95)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<N;i++){
+      const px = xToPx(zs[i]);
+      const py = yPhipToPx(phips[i]);
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    const xz0 = xToPx(x.z0);
+    ctx.strokeStyle="rgba(245,158,11,.95)";
+    ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.moveTo(xz0, padT); ctx.lineTo(xz0, h-padB); ctx.stroke();
+
+    ctx.fillStyle = "rgba(203,213,225,.9)";
+    ctx.font = "12px system-ui";
+    ctx.fillText("z (m)", (padL + (w-padR))/2, h-12);
+
+    ctx.font = "12px ui-monospace, monospace";
+    ctx.fillText("Φ(z)", padL, padT+12);
+    ctx.fillText("Φ'(z)", padL, mid+22);
+
+    ctx.fillStyle = "rgba(203,213,225,.75)";
+    ctx.font = "11px ui-monospace, monospace";
+    ctx.fillText(phiMax.toFixed(3), 8, padT+12);
+    ctx.fillText(phiMin.toFixed(3), 8, mid-12);
+    ctx.fillText(phipMax.toExponential(2), 8, mid+18);
+    ctx.fillText(phipMin.toExponential(2), 8, h-padB);
+
+    if (rb.enabled){
+      const epsOkLow = 1+eps, epsOkHigh = 1-eps;
+      for(let i=0;i<N;i++){
+        const z = zs[i];
+        const phi = phis[i];
+        const phip = phips[i];
+        const bad1 = (z < x.z0 && phi < epsOkLow) || (z > x.z0 && phi > epsOkHigh);
+        const bad2 = (phip >= 0);
+        const bad3 = (Math.abs(g*phip) < rb.kappaMin);
+        if (bad1){
+          ctx.fillStyle = "rgba(16,185,129,.95)";
+          ctx.fillRect(xToPx(z)-2, yPhiToPx(phi)-2, 4, 4);
+        }
+        if (bad2 || bad3){
+          ctx.fillStyle = bad2 ? "rgba(239,68,68,.95)" : "rgba(34,211,238,.95)";
+          ctx.fillRect(xToPx(z)-2, yPhipToPx(phip)-2, 4, 4);
+        }
+      }
+    }
+  }
+
+  // ---------------------------
+  // UI update
+  // ---------------------------
   function updateFeasibility(x){
     const C = currentConstraints();
-    const reasons = feasibilityReasons(x,C);
+    const rb = currentRobust();
+
+    const rc = rb.enabled ? robustConfinementCheck(x, rb) : null;
+
+    const reasons = feasibilityReasons(x, C, rb);
     const ok = reasons.length===0;
 
-    el("feasTxt").textContent = ok ? "FEASIBLE" : "INFEASIBLE";
+    el("feasTxt").textContent = ok
+      ? (rb.enabled ? (rc.ok ? "FEASIBLE | ROBUST PASS" : "FEASIBLE | ROBUST FAIL") : "FEASIBLE")
+      : "INFEASIBLE";
+
     el("dotFeas").className = "dot " + (ok ? "good" : "bad");
-    el("whyTxt").textContent = ok ? "All active constraints satisfied (including a'(z0)<0)." : reasons.map(r => "- " + r).join("\n");
+
+    let extra = "";
+    if (rb.enabled && rc){
+      extra =
+        `\n\nRobust stats (band):\n` +
+        `z∈[${rc.stats.zLo.toFixed(3)}, ${rc.stats.zHi.toFixed(3)}] m\n` +
+        `min Φ below = ${rc.stats.minPhiBelow.toFixed(4)} (≥ ${(1+rb.epsBand).toFixed(4)})\n` +
+        `max Φ above = ${rc.stats.maxPhiAbove.toFixed(4)} (≤ ${(1-rb.epsBand).toFixed(4)})\n` +
+        `max Φ' = ${rc.stats.maxPhiPrime.toExponential(3)} (< 0)\n` +
+        `min |a'| = ${rc.stats.minAbsAPrime.toFixed(3)} s^-2 (≥ κ_min=${rb.kappaMin.toFixed(3)})`;
+    }
+
+    el("whyTxt").textContent = ok
+      ? "All active constraints satisfied." + extra
+      : reasons.map(r => "- " + r).join("\n") + extra;
   }
 
   function update(){
     const x = currentX();
     const profile = el("profile").value;
+    const rb = currentRobust();
 
     el("R_v").textContent = fmt(x.R,2);
     el("h_v").textContent = fmt(x.h,3);
@@ -722,21 +958,16 @@
     const V = volume(x);
     const P = rho*V/Math.max(1e-15,x.tau);
 
-    const ap = aPrimeAtZ0(x);
-    const fT = f0FromAprime(ap);
-
     el("G_v").textContent = fmt(GG,6);
     el("rho_v").textContent = fmtAuto(rho);
     el("V_v").textContent = V.toExponential(3);
     el("P_v").textContent = fmtAuto(P);
 
-    el("ap_v").textContent = (Number.isFinite(ap) ? ap.toExponential(3) : "—");
-    el("fT_v").textContent = (Number.isFinite(fT.f) ? `${fT.f.toExponential(3)} , ${fT.T.toExponential(3)}` : "—");
-
     updateFeasibility(x);
 
     drawMap(el("map").getContext("2d"), x.R, profile);
-    drawPlot(el("plot").getContext("2d"), x);
+    drawPlotA(el("plot").getContext("2d"), x);
+    drawTrapDiagnostics(el("trap").getContext("2d"), x, rb);
   }
 
   function applyX(best){
@@ -749,6 +980,7 @@
 
   function runOpt(apply){
     const C = currentConstraints();
+    const rb = currentRobust();
     const cur = currentX();
 
     const bounds = {
@@ -756,30 +988,23 @@
       hmin:0.001, hmax:0.20,
       z0min:0.01, z0max:2.0,
       mmin:0.0,  mmax:10.0,
-
-      etaFixed:cur.eta,
-      lamFixed:cur.lam,
-      betaFixed:cur.beta,
-      tauFixed:cur.tau
+      etaFixed:cur.eta, lamFixed:cur.lam, betaFixed:cur.beta, tauFixed:cur.tau
     };
 
     const objectiveType = el("obj").value;
-    const weights = {
-      wP: parseFloat(el("wP").value),
-      wR: parseFloat(el("wR").value),
-      wV: parseFloat(el("wV").value),
-    };
+    const weights = { wP: +el("wP").value, wR: +el("wR").value, wV: +el("wV").value };
     const preset = el("gridPreset").value;
-    const randIters = parseFloat(el("randIters").value);
+    const randIters = +el("randIters").value;
 
-    const best = constrainedMinimize(bounds, C, objectiveType, weights, preset, randIters);
+    const best = constrainedMinimize(bounds, C, rb, objectiveType, weights, preset, randIters);
 
     if (!best){
       el("dotBest").className = "dot bad";
       el("bestTxt").textContent = "NONE";
       el("bestMono").textContent =
         "No feasible design found under current constraints.\n" +
-        "Try increasing A_max/V_max, relaxing P_max or rho_max, or lowering z_clear.\n" +
+        "Try increasing A_max/V_max, relaxing P_max or rho_max, lowering z_clear,\n" +
+        "or temporarily disabling robust gate to diagnose.\n" +
         "Also try 'Deep' grid or more random iterations.";
       return;
     }
@@ -787,14 +1012,15 @@
     el("dotBest").className = "dot good";
     el("bestTxt").textContent = "FOUND";
 
+    const rbLine = rb.enabled ? `worst-case κ (band)=${best.worstK.toFixed(3)} s^-2\n` : "";
     el("bestMono").textContent =
       `R=${best.R.toFixed(3)} m, h=${best.h.toFixed(4)} m, z0=${best.z0.toFixed(3)} m, m=${best.m.toFixed(3)} 1/m\n` +
-      `G=${best.G.toExponential(3)},  G'=${best.dG.toExponential(3)}\n` +
-      `a'(z0)=${best.ap.toExponential(3)} s^-2  (confinement |a'|=${best.conf.toExponential(3)})\n` +
-      `f0=${best.f0.toExponential(3)} Hz,  T0=${best.T0.toExponential(3)} s\n` +
+      `G=${best.G.toExponential(3)}\n` +
       `rho_req=${best.rho.toExponential(3)} J/m^3\n` +
       `A=πR^2=${best.A.toExponential(3)} m^2, V=πR^2h=${best.V.toExponential(3)} m^3\n` +
       `Pin=${best.P.toExponential(3)} W\n` +
+      `a'(z0)=${best.ap0.toFixed(3)} s^-2\n` +
+      rbLine +
       `Objective J=${Number.isFinite(best.J)? best.J.toExponential(3): best.J}`;
 
     if (apply) applyX(best);
@@ -817,13 +1043,20 @@
     el("rhomax").value=1e12;
     el("useCaps").value="yes";
 
-    el("obj").value="maxConf";
+    el("rcEnable").value="yes";
+    el("deltaZ").value=0.02;
+    el("epsBand").value=0.02;
+    el("kappaMin").value=30;
+    el("rcSamples").value=81;
+
+    el("obj").value="minPin";
     el("randIters").value=30000;
     el("wP").value=1.0;
     el("wR").value=0.0;
     el("wV").value=0.0;
     el("gridPreset").value="med";
     el("profile").value="uniform";
+
     update();
 
     el("dotBest").className="dot";
@@ -831,7 +1064,27 @@
     el("bestMono").textContent="—";
   }
 
-  ["R","h","z0","m","eta","lam","beta","tau","profile","zClear","Amax","Vmax","Pmax","rhomax","useCaps"].forEach(id=>{
+  function applyRobustSuggested(){
+    const x = currentX();
+    const ap0 = Math.abs(aPrimeOfZ(x.z0, x));
+
+    const dz = Math.max(0.005, Math.min(0.02, 0.2*x.z0));
+    const kmin = Math.max(10, Math.min(120, 0.6*ap0));
+
+    el("deltaZ").value = dz.toFixed(3);
+    el("kappaMin").value = Math.round(kmin).toString();
+    el("epsBand").value = "0.02";
+    el("rcEnable").value = "yes";
+    update();
+  }
+
+  // Wire events
+  const ids = [
+    "R","h","z0","m","eta","lam","beta","tau","profile",
+    "zClear","Amax","Vmax","Pmax","rhomax","useCaps",
+    "rcEnable","deltaZ","epsBand","kappaMin","rcSamples"
+  ];
+  ids.forEach(id=>{
     el(id).addEventListener("input", update);
     el(id).addEventListener("change", update);
   });
@@ -839,6 +1092,7 @@
   el("optApply").addEventListener("click", ()=>runOpt(true));
   el("optOnly").addEventListener("click", ()=>runOpt(false));
   el("reset").addEventListener("click", resetDefaults);
+  el("rcAuto").addEventListener("click", applyRobustSuggested);
 
   update();
 })();
