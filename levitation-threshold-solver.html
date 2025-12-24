@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Levitation Threshold + Constraints + Constrained Optimization (Disk + Yukawa)</title>
+  <title>Levitation Threshold + Constraints + Confinement Optimizer (Disk + Yukawa)</title>
   <style>
     :root{
       --bg:#0b1220; --panel:#111c33; --panel2:#0f172a; --text:#cbd5e1; --muted:#94a3b8;
@@ -107,8 +107,19 @@
       font-size:12px;
       line-height:1.35;
     }
-    .status .ok{color:var(--good); font-weight:800}
-    .status .no{color:var(--bad); font-weight:800}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(15,23,42,.35);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .dot{width:9px;height:9px;border-radius:999px;background:var(--muted)}
+    .dot.good{background:var(--good)}
+    .dot.bad{background:var(--bad)}
+    .dot.warn{background:var(--warn)}
     canvas{
       width:100%;
       height:auto;
@@ -131,30 +142,19 @@
       gap:10px;
       margin-top:6px;
     }
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(15,23,42,.35);
-      font-size:12px;
-      color:var(--muted);
-    }
-    .dot{width:9px;height:9px;border-radius:999px;background:var(--muted)}
-    .dot.good{background:var(--good)}
-    .dot.bad{background:var(--bad)}
-    .dot.warn{background:var(--warn)}
   </style>
 </head>
 <body>
-  <h1>Finite Disk + Yukawa: Threshold, Constraints, and Constrained Minimization</h1>
+  <h1>Finite Disk + Yukawa: Threshold, Constraints, and Confinement Optimizer</h1>
   <div class="sub">
-    Model: <span class="mono">(∇² − m²)χ = −λ ρc</span>, on-axis gradient via disk approximation, and
-    <span class="mono">a_z = β η ∂zχ</span>. This is a mathematical instrument panel (hypothetical interaction model).
+    Model: <span class="mono">(∇² − m²)χ = −λ ρc</span>, on-axis disk approximation, and
+    <span class="mono">a_z = β η ∂zχ</span>.
+    Passive stability requires <span class="mono">a'(z0)&lt;0</span> and then
+    <span class="mono">ω0=√(−a'(z0))</span>, <span class="mono">f0=ω0/(2π)</span>.
   </div>
 
   <div class="grid">
-    <!-- LEFT: PARAMETERS + CONSTRAINTS + OPTIMIZER -->
+    <!-- LEFT -->
     <div class="card">
       <h2>1) Parameters</h2>
 
@@ -219,18 +219,28 @@
           <div class="mono v" id="rho_v">—</div>
         </div>
         <div class="kpi">
-          <small>Volume V = πR²h (m³)</small>
-          <div class="mono v" id="V_v">—</div>
-        </div>
-        <div class="kpi">
           <small>Pin ≈ ρc V / τ (W)</small>
           <div class="mono v" id="P_v">—</div>
+        </div>
+        <div class="kpi">
+          <small>V = πR²h (m³)</small>
+          <div class="mono v" id="V_v">—</div>
+        </div>
+
+        <div class="kpi">
+          <small>a'(z₀) (s⁻²)</small>
+          <div class="mono v" id="ap_v">—</div>
+        </div>
+        <div class="kpi">
+          <small>f₀ (Hz), T₀ (s)</small>
+          <div class="mono v" id="fT_v">—</div>
         </div>
       </div>
 
       <div class="note">
         Threshold uses <span class="mono">g = β η (λ ρc h G)</span> so
         <span class="mono">ρc,req = g / (β η λ h G)</span>.
+        With ρc set to ρc,req, confinement is <span class="mono">a'(z0)=g·G'(z0)/G(z0)</span>.
       </div>
 
       <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
@@ -286,7 +296,8 @@
         <div>
           <div class="lbl">Objective</div>
           <select id="obj">
-            <option value="minPin" selected>Minimize Pin</option>
+            <option value="maxConf" selected>Maximize confinement (most negative a'(z0))</option>
+            <option value="minPin">Minimize Pin</option>
             <option value="minRho">Minimize ρc,req</option>
             <option value="weighted">Weighted log objective</option>
           </select>
@@ -335,7 +346,7 @@
       </div>
     </div>
 
-    <!-- RIGHT: VISUALS -->
+    <!-- RIGHT -->
     <div class="card">
       <h2>4) Visualizations</h2>
       <div class="vizgrid">
@@ -349,7 +360,7 @@
         </div>
       </div>
       <div class="note">
-        Right plot uses <span class="mono">a_z(z)=β η λ ρc h G(z,R,m)</span> with current ρc set to ρc,req at z=z₀, so the curve
+        Right plot uses <span class="mono">a_z(z)=β η λ ρc h G(z,R,m)</span> with ρc set to ρc,req at z=z₀, so the curve
         shows how quickly the effect decays away from the chosen standoff.
       </div>
     </div>
@@ -363,17 +374,32 @@
   const fmt = (x, n=4) => (Number.isFinite(x) ? x.toFixed(n) : "—");
   const fmtAuto = (x) => {
     if(!Number.isFinite(x)) return "—";
-    if (Math.abs(x) < 1e6) return x.toFixed(4);
+    if (Math.abs(x) < 1e6) return x.toFixed(6);
     return x.toExponential(3);
   };
 
-  // Geometry factor
-  function G(z0, R, m){
-    const a = Math.max(1e-12, z0);
-    const b = Math.sqrt(z0*z0 + R*R);
+  // Disk-Yukawa geometry factor:
+  // G(z) = 0.5*( e^{-m z} - (z/b) e^{-m b} ), b = sqrt(z^2 + R^2)
+  function G(z, R, m){
+    const a = Math.max(1e-12, z);
+    const b = Math.sqrt(z*z + R*R);
     const term1 = Math.exp(-m*a);
-    const term2 = (z0/b)*Math.exp(-m*b);
+    const term2 = (z/b)*Math.exp(-m*b);
     return Math.max(1e-15, 0.5*(term1 - term2));
+  }
+
+  // Analytic derivative dG/dz for the same approximation:
+  // d/dz[(z/b)e^{-mb}] = e^{-mb}*( R^2/b^3 - m z^2/b^2 )
+  // so dG/dz = 0.5*( -m e^{-mz} - e^{-mb}*( R^2/b^3 - m z^2/b^2 ) )
+  function dGdz(z, R, m){
+    const a = Math.max(1e-12, z);
+    const b = Math.sqrt(z*z + R*R);
+    const emz = Math.exp(-m*a);
+    const emb = Math.exp(-m*b);
+    const term = (R*R)/(b*b*b) - (m*z*z)/(b*b);
+    const dterm1 = -m * emz;
+    const dterm2 = emb * term;
+    return 0.5*(dterm1 - dterm2);
   }
 
   function rhoReq(x){
@@ -388,8 +414,24 @@
   }
 
   function volume(x){ return Math.PI * x.R*x.R * x.h; }
-  function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
   function area(x){ return Math.PI * x.R*x.R; }
+  function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
+
+  // With rho set to rhoReq (so a(z0)=g), the slope is:
+  // a'(z0) = g * (G'(z0)/G(z0))
+  function aPrimeAtZ0(x){
+    const GG = G(x.z0, x.R, x.m);
+    const dG = dGdz(x.z0, x.R, x.m);
+    return g * (dG / Math.max(1e-15, GG));
+  }
+
+  function f0FromAprime(ap){
+    if (!(ap < 0)) return {f: NaN, T: NaN};
+    const w0 = Math.sqrt(-ap);
+    const f0 = w0/(2*Math.PI);
+    const T0 = 1/Math.max(1e-15,f0);
+    return {f:f0, T:T0};
+  }
 
   function currentX(){
     return {
@@ -419,6 +461,7 @@
   function feasibilityReasons(x, C){
     const reasons = [];
     if (x.z0 < C.zClear) reasons.push(`z0 < z_clear  (${x.z0.toFixed(3)} < ${C.zClear.toFixed(3)})`);
+
     const A = area(x);
     const V = volume(x);
     const rho = rhoReq(x);
@@ -432,6 +475,10 @@
     const GG = G(x.z0, x.R, x.m);
     if (!(GG > 0)) reasons.push(`G(z0,R,m) is nonpositive (check m,z0,R)`);
 
+    // Passive stability constraint:
+    const ap = aPrimeAtZ0(x);
+    if (!(ap < 0)) reasons.push(`Passive stability fails: a'(z0) ≥ 0  (a'=${ap.toExponential(3)} s^-2)`);
+
     return reasons;
   }
 
@@ -443,6 +490,13 @@
     const rho = rhoReq(x);
     const P = rho * volume(x) / Math.max(1e-15,x.tau);
     const V = volume(x);
+    const ap = aPrimeAtZ0(x);
+
+    if (kind === "maxConf") {
+      // We want "most negative a'(z0)" => minimize a'(z0) directly.
+      // (Feasibility already enforces a'(z0)<0)
+      return ap;
+    }
     if (kind === "minPin") return P;
     if (kind === "minRho") return rho;
 
@@ -520,11 +574,17 @@
 
     if (best){
       best.G = G(best.z0,best.R,best.m);
+      best.dG = dGdz(best.z0,best.R,best.m);
+      best.ap = aPrimeAtZ0(best);
+      const fT = f0FromAprime(best.ap);
+      best.f0 = fT.f;
+      best.T0 = fT.T;
       best.rho = rhoReq(best);
       best.V = volume(best);
       best.A = area(best);
       best.P = pin(best);
       best.J = bestJ;
+      best.conf = -best.ap; // larger = stiffer trap
     }
     return best;
   }
@@ -533,7 +593,7 @@
     const w = ctx.canvas.width, h = ctx.canvas.height;
     const img = ctx.createImageData(w,h);
     const cx = w/2, cy = h/2;
-    const span = 2.2*Rm;            // show square width = 2.2R
+    const span = 2.2*Rm;
     const pxToM = span / w;
     const sigma = 0.35*Rm;
 
@@ -558,7 +618,6 @@
     }
     ctx.putImageData(img,0,0);
 
-    // radius marker
     ctx.strokeStyle="rgba(203,213,225,.9)";
     ctx.lineWidth=2;
     ctx.beginPath();
@@ -571,7 +630,6 @@
     const w = ctx.canvas.width, h = ctx.canvas.height;
     ctx.clearRect(0,0,w,h);
 
-    // axes
     ctx.strokeStyle="rgba(203,213,225,.55)";
     ctx.lineWidth=1;
     ctx.beginPath();
@@ -582,7 +640,7 @@
     const zMin = 0.01;
     const N = 240;
 
-    const rho = rhoReq(x); // choose rho so that a(z0)=g
+    const rho = rhoReq(x);
     let vmax = 0;
     const vals = [];
     for(let i=0;i<N;i++){
@@ -595,7 +653,6 @@
     }
     vmax = Math.max(vmax, 1e-12);
 
-    // line
     ctx.strokeStyle="rgba(59,130,246,.95)";
     ctx.lineWidth=2;
     ctx.beginPath();
@@ -606,7 +663,6 @@
     }
     ctx.stroke();
 
-    // g line
     const gy = (h-50) - (h-90)*(g / vmax);
     if (g < vmax){
       ctx.setLineDash([6,6]);
@@ -618,14 +674,12 @@
       ctx.fillText("g", 66, gy-6);
     }
 
-    // z0 marker
     const xz0 = 60 + (w-85)*(x.z0 - zMin)/(zMax-zMin);
     ctx.strokeStyle="rgba(245,158,11,.9)";
     ctx.beginPath(); ctx.moveTo(xz0,30); ctx.lineTo(xz0,h-50); ctx.stroke();
     ctx.fillStyle="rgba(245,158,11,.95)";
     ctx.fillText("z0", xz0+4, 44);
 
-    // labels
     ctx.fillStyle="rgba(203,213,225,.9)";
     ctx.font="13px system-ui";
     ctx.fillText("z (m)", w/2, h-14);
@@ -646,10 +700,8 @@
     const ok = reasons.length===0;
 
     el("feasTxt").textContent = ok ? "FEASIBLE" : "INFEASIBLE";
-    const dot = el("dotFeas");
-    dot.className = "dot " + (ok ? "good" : "bad");
-
-    el("whyTxt").textContent = ok ? "All active constraints satisfied." : reasons.map(r => "- " + r).join("\n");
+    el("dotFeas").className = "dot " + (ok ? "good" : "bad");
+    el("whyTxt").textContent = ok ? "All active constraints satisfied (including a'(z0)<0)." : reasons.map(r => "- " + r).join("\n");
   }
 
   function update(){
@@ -670,14 +722,19 @@
     const V = volume(x);
     const P = rho*V/Math.max(1e-15,x.tau);
 
+    const ap = aPrimeAtZ0(x);
+    const fT = f0FromAprime(ap);
+
     el("G_v").textContent = fmt(GG,6);
     el("rho_v").textContent = fmtAuto(rho);
     el("V_v").textContent = V.toExponential(3);
     el("P_v").textContent = fmtAuto(P);
 
+    el("ap_v").textContent = (Number.isFinite(ap) ? ap.toExponential(3) : "—");
+    el("fT_v").textContent = (Number.isFinite(fT.f) ? `${fT.f.toExponential(3)} , ${fT.T.toExponential(3)}` : "—");
+
     updateFeasibility(x);
 
-    // draw
     drawMap(el("map").getContext("2d"), x.R, profile);
     drawPlot(el("plot").getContext("2d"), x);
   }
@@ -687,7 +744,6 @@
     el("h").value = best.h.toFixed(3);
     el("z0").value = best.z0.toFixed(2);
     el("m").value = best.m.toFixed(2);
-    // eta/lam/beta/tau are treated as "hardware fixed" = current slider values
     update();
   }
 
@@ -696,13 +752,11 @@
     const cur = currentX();
 
     const bounds = {
-      // decision-variable bounds (match slider bounds)
       Rmin:0.05, Rmax:2.0,
       hmin:0.001, hmax:0.20,
       z0min:0.01, z0max:2.0,
       mmin:0.0,  mmax:10.0,
 
-      // treat these as fixed hardware parameters (from current sliders)
       etaFixed:cur.eta,
       lamFixed:cur.lam,
       betaFixed:cur.beta,
@@ -718,12 +772,10 @@
     const preset = el("gridPreset").value;
     const randIters = parseFloat(el("randIters").value);
 
-    // Basic sanity: if constraints impossible with given caps, still try but report.
     const best = constrainedMinimize(bounds, C, objectiveType, weights, preset, randIters);
 
-    const dot = el("dotBest");
     if (!best){
-      dot.className = "dot bad";
+      el("dotBest").className = "dot bad";
       el("bestTxt").textContent = "NONE";
       el("bestMono").textContent =
         "No feasible design found under current constraints.\n" +
@@ -732,12 +784,14 @@
       return;
     }
 
-    dot.className = "dot good";
+    el("dotBest").className = "dot good";
     el("bestTxt").textContent = "FOUND";
 
     el("bestMono").textContent =
       `R=${best.R.toFixed(3)} m, h=${best.h.toFixed(4)} m, z0=${best.z0.toFixed(3)} m, m=${best.m.toFixed(3)} 1/m\n` +
-      `G=${best.G.toExponential(3)}\n` +
+      `G=${best.G.toExponential(3)},  G'=${best.dG.toExponential(3)}\n` +
+      `a'(z0)=${best.ap.toExponential(3)} s^-2  (confinement |a'|=${best.conf.toExponential(3)})\n` +
+      `f0=${best.f0.toExponential(3)} Hz,  T0=${best.T0.toExponential(3)} s\n` +
       `rho_req=${best.rho.toExponential(3)} J/m^3\n` +
       `A=πR^2=${best.A.toExponential(3)} m^2, V=πR^2h=${best.V.toExponential(3)} m^3\n` +
       `Pin=${best.P.toExponential(3)} W\n` +
@@ -763,7 +817,7 @@
     el("rhomax").value=1e12;
     el("useCaps").value="yes";
 
-    el("obj").value="minPin";
+    el("obj").value="maxConf";
     el("randIters").value=30000;
     el("wP").value=1.0;
     el("wR").value=0.0;
@@ -777,7 +831,6 @@
     el("bestMono").textContent="—";
   }
 
-  // Wire events
   ["R","h","z0","m","eta","lam","beta","tau","profile","zClear","Amax","Vmax","Pmax","rhomax","useCaps"].forEach(id=>{
     el(id).addEventListener("input", update);
     el(id).addEventListener("change", update);
@@ -787,7 +840,6 @@
   el("optOnly").addEventListener("click", ()=>runOpt(false));
   el("reset").addEventListener("click", resetDefaults);
 
-  // init
   update();
 })();
 </script>
