@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Levitation Threshold + Constraints + Constrained Optimization (Disk + Yukawa)</title>
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#111c33; --panel2:#0f172a; --text:#cbd5e1; --muted:#94a3b8;
+      --accent:#3b82f6; --good:#10b981; --warn:#f59e0b; --bad:#ef4444; --line:#23304a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:14px;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg),#070b14);
+      color:var(--text);
+    }
+    h1{margin:0 0 10px; font-size:18px; font-weight:700}
+    .sub{color:var(--muted); font-size:12px; margin-bottom:12px; line-height:1.35}
+    .grid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns: 1fr}
+    }
+    .card{
+      background:rgba(17,28,51,.9);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .card h2{
+      margin:0 0 8px;
+      font-size:14px; color:#e5e7eb;
+      display:flex; align-items:center; gap:8px;
+    }
+    .row{
+      display:grid;
+      grid-template-columns: 150px 1fr 86px;
+      gap:10px;
+      align-items:center;
+      margin:8px 0;
+    }
+    .row .lbl{font-size:12px; color:var(--muted)}
+    input[type="range"]{width:100%}
+    input[type="number"], select{
+      width:100%;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:rgba(15,23,42,.9);
+      color:var(--text);
+      outline:none;
+    }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+    .kpis{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .kpi{
+      border:1px dashed rgba(148,163,184,.35);
+      border-radius:12px;
+      padding:10px;
+      background:rgba(15,23,42,.35);
+    }
+    .kpi small{display:block; color:var(--muted); margin-bottom:6px}
+    .kpi .v{font-size:13px; font-weight:700}
+    .btnrow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
+    button{
+      border:1px solid rgba(59,130,246,.35);
+      background:linear-gradient(135deg,#2563eb,#3b82f6);
+      color:white; font-weight:700;
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      flex:1;
+      min-width:160px;
+      touch-action: manipulation;
+    }
+    button.secondary{
+      border:1px solid rgba(148,163,184,.35);
+      background:rgba(15,23,42,.6);
+      color:var(--text);
+      font-weight:700;
+    }
+    button.danger{
+      border:1px solid rgba(239,68,68,.35);
+      background:linear-gradient(135deg,#b91c1c,#ef4444);
+    }
+    .note{
+      font-size:12px; color:var(--muted);
+      margin-top:10px; line-height:1.35;
+    }
+    .status{
+      margin-top:10px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(15,23,42,.35);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .status .ok{color:var(--good); font-weight:800}
+    .status .no{color:var(--bad); font-weight:800}
+    canvas{
+      width:100%;
+      height:auto;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(15,23,42,.35);
+    }
+    .vizgrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width: 980px){
+      .vizgrid{grid-template-columns:1fr}
+    }
+    .tight{margin-top:6px}
+    .smallrow{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:6px;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(15,23,42,.35);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .dot{width:9px;height:9px;border-radius:999px;background:var(--muted)}
+    .dot.good{background:var(--good)}
+    .dot.bad{background:var(--bad)}
+    .dot.warn{background:var(--warn)}
+  </style>
+</head>
+<body>
+  <h1>Finite Disk + Yukawa: Threshold, Constraints, and Constrained Minimization</h1>
+  <div class="sub">
+    Model: <span class="mono">(∇² − m²)χ = −λ ρc</span>, on-axis gradient via disk approximation, and
+    <span class="mono">a_z = β η ∂zχ</span>. This is a mathematical instrument panel (hypothetical interaction model).
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: PARAMETERS + CONSTRAINTS + OPTIMIZER -->
+    <div class="card">
+      <h2>1) Parameters</h2>
+
+      <div class="row">
+        <div class="lbl">Disk radius R (m)</div>
+        <input id="R" type="range" min="0.05" max="2.0" step="0.01" value="0.25">
+        <div class="mono" id="R_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">Thickness h (m)</div>
+        <input id="h" type="range" min="0.001" max="0.20" step="0.001" value="0.02">
+        <div class="mono" id="h_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">Standoff z₀ (m)</div>
+        <input id="z0" type="range" min="0.01" max="2.0" step="0.01" value="0.10">
+        <div class="mono" id="z0_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">Screening m (1/m)</div>
+        <input id="m" type="range" min="0.0" max="10.0" step="0.05" value="1.00">
+        <div class="mono" id="m_v"></div>
+      </div>
+
+      <div class="row">
+        <div class="lbl">η_net (0..1)</div>
+        <input id="eta" type="range" min="0.05" max="1.00" step="0.01" value="0.65">
+        <div class="mono" id="eta_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">λ (m/J)</div>
+        <input id="lam" type="range" min="0.001" max="10.0" step="0.001" value="1.000">
+        <div class="mono" id="lam_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">β (m²/s²)</div>
+        <input id="beta" type="range" min="0.001" max="10.0" step="0.001" value="0.100">
+        <div class="mono" id="beta_v"></div>
+      </div>
+      <div class="row">
+        <div class="lbl">τ (s)</div>
+        <input id="tau" type="range" min="0.01" max="30.0" step="0.01" value="1.00">
+        <div class="mono" id="tau_v"></div>
+      </div>
+
+      <div class="row">
+        <div class="lbl">Profile (viz)</div>
+        <select id="profile">
+          <option value="uniform">Uniform disk ρc</option>
+          <option value="gaussian">Gaussian ρc(r)</option>
+        </select>
+        <div></div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <small>Geometry factor G(z₀,R,m)</small>
+          <div class="mono v" id="G_v">—</div>
+        </div>
+        <div class="kpi">
+          <small>ρc,req (J/m³)</small>
+          <div class="mono v" id="rho_v">—</div>
+        </div>
+        <div class="kpi">
+          <small>Volume V = πR²h (m³)</small>
+          <div class="mono v" id="V_v">—</div>
+        </div>
+        <div class="kpi">
+          <small>Pin ≈ ρc V / τ (W)</small>
+          <div class="mono v" id="P_v">—</div>
+        </div>
+      </div>
+
+      <div class="note">
+        Threshold uses <span class="mono">g = β η (λ ρc h G)</span> so
+        <span class="mono">ρc,req = g / (β η λ h G)</span>.
+      </div>
+
+      <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
+
+      <h2>2) Constraints</h2>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">z_clear (m)</div>
+          <input id="zClear" type="number" step="0.01" value="0.05">
+        </div>
+        <div>
+          <div class="lbl">A_max = πR² (m²)</div>
+          <input id="Amax" type="number" step="0.01" value="2.00">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">V_max = πR²h (m³)</div>
+          <input id="Vmax" type="number" step="0.001" value="0.05">
+        </div>
+        <div>
+          <div class="lbl">P_max (W)</div>
+          <input id="Pmax" type="number" step="1" value="1e9">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">ρc_max (J/m³)</div>
+          <input id="rhomax" type="number" step="1" value="1e12">
+        </div>
+        <div>
+          <div class="lbl">Use caps</div>
+          <select id="useCaps">
+            <option value="yes" selected>Yes (enforce P_max & ρc_max)</option>
+            <option value="no">No (ignore P_max & ρc_max)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="status" id="feas">
+        <span class="pill"><span class="dot" id="dotFeas"></span> Feasibility: <span id="feasTxt">—</span></span>
+        <div class="mono" id="whyTxt" style="margin-top:8px; white-space:pre-wrap;">—</div>
+      </div>
+
+      <hr class="tight" style="border:0;border-top:1px solid var(--line);margin:12px 0;">
+
+      <h2>3) Constrained optimization</h2>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">Objective</div>
+          <select id="obj">
+            <option value="minPin" selected>Minimize Pin</option>
+            <option value="minRho">Minimize ρc,req</option>
+            <option value="weighted">Weighted log objective</option>
+          </select>
+        </div>
+        <div>
+          <div class="lbl">Random iterations</div>
+          <input id="randIters" type="number" step="1000" value="30000">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">wP (weighted)</div>
+          <input id="wP" type="number" step="0.1" value="1.0">
+        </div>
+        <div>
+          <div class="lbl">wρ (weighted)</div>
+          <input id="wR" type="number" step="0.1" value="0.0">
+        </div>
+      </div>
+
+      <div class="smallrow">
+        <div>
+          <div class="lbl">wV (weighted)</div>
+          <input id="wV" type="number" step="0.1" value="0.0">
+        </div>
+        <div>
+          <div class="lbl">Grid resolution</div>
+          <select id="gridPreset">
+            <option value="fast">Fast</option>
+            <option value="med" selected>Medium</option>
+            <option value="deep">Deep</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button id="optApply">Optimize & Apply</button>
+        <button id="optOnly" class="secondary">Optimize (no apply)</button>
+        <button id="reset" class="danger">Reset defaults</button>
+      </div>
+
+      <div class="status" id="bestBox">
+        <div class="pill"><span class="dot" id="dotBest"></span> Best feasible: <span id="bestTxt">—</span></div>
+        <div class="mono" id="bestMono" style="margin-top:8px; white-space:pre-wrap;">—</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: VISUALS -->
+    <div class="card">
+      <h2>4) Visualizations</h2>
+      <div class="vizgrid">
+        <div>
+          <div class="sub">Coherence density map ρc(x,y) (normalized profile)</div>
+          <canvas id="map" width="620" height="620"></canvas>
+        </div>
+        <div>
+          <div class="sub">On-axis curve: a_z(z) using current ρc,req (scaled)</div>
+          <canvas id="plot" width="620" height="620"></canvas>
+        </div>
+      </div>
+      <div class="note">
+        Right plot uses <span class="mono">a_z(z)=β η λ ρc h G(z,R,m)</span> with current ρc set to ρc,req at z=z₀, so the curve
+        shows how quickly the effect decays away from the chosen standoff.
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const g = 9.81;
+  const el = (id) => document.getElementById(id);
+
+  const fmt = (x, n=4) => (Number.isFinite(x) ? x.toFixed(n) : "—");
+  const fmtAuto = (x) => {
+    if(!Number.isFinite(x)) return "—";
+    if (Math.abs(x) < 1e6) return x.toFixed(4);
+    return x.toExponential(3);
+  };
+
+  // Geometry factor
+  function G(z0, R, m){
+    const a = Math.max(1e-12, z0);
+    const b = Math.sqrt(z0*z0 + R*R);
+    const term1 = Math.exp(-m*a);
+    const term2 = (z0/b)*Math.exp(-m*b);
+    return Math.max(1e-15, 0.5*(term1 - term2));
+  }
+
+  function rhoReq(x){
+    const GG = G(x.z0, x.R, x.m);
+    const denom =
+      Math.max(1e-15,x.beta) *
+      Math.max(1e-15,x.eta) *
+      Math.max(1e-15,x.lam) *
+      Math.max(1e-15,x.h)   *
+      GG;
+    return g / denom;
+  }
+
+  function volume(x){ return Math.PI * x.R*x.R * x.h; }
+  function pin(x){ return rhoReq(x) * volume(x) / Math.max(1e-15,x.tau); }
+  function area(x){ return Math.PI * x.R*x.R; }
+
+  function currentX(){
+    return {
+      R: parseFloat(el("R").value),
+      h: parseFloat(el("h").value),
+      z0: parseFloat(el("z0").value),
+      m: parseFloat(el("m").value),
+      eta: parseFloat(el("eta").value),
+      lam: parseFloat(el("lam").value),
+      beta: parseFloat(el("beta").value),
+      tau: parseFloat(el("tau").value),
+    };
+  }
+
+  function currentConstraints(){
+    const useCaps = el("useCaps").value === "yes";
+    return {
+      zClear: parseFloat(el("zClear").value),
+      Amax: parseFloat(el("Amax").value),
+      Vmax: parseFloat(el("Vmax").value),
+      Pmax: useCaps ? parseFloat(el("Pmax").value) : Infinity,
+      rhoMax: useCaps ? parseFloat(el("rhomax").value) : Infinity,
+      useCaps,
+    };
+  }
+
+  function feasibilityReasons(x, C){
+    const reasons = [];
+    if (x.z0 < C.zClear) reasons.push(`z0 < z_clear  (${x.z0.toFixed(3)} < ${C.zClear.toFixed(3)})`);
+    const A = area(x);
+    const V = volume(x);
+    const rho = rhoReq(x);
+    const P = rho * V / Math.max(1e-15, x.tau);
+
+    if (A > C.Amax) reasons.push(`Area πR² > A_max  (${A.toExponential(3)} > ${C.Amax.toExponential(3)})`);
+    if (V > C.Vmax) reasons.push(`Volume πR²h > V_max  (${V.toExponential(3)} > ${C.Vmax.toExponential(3)})`);
+    if (rho > C.rhoMax) reasons.push(`rho_req > rho_max  (${rho.toExponential(3)} > ${C.rhoMax.toExponential(3)})`);
+    if (P > C.Pmax) reasons.push(`Pin > P_max  (${P.toExponential(3)} > ${C.Pmax.toExponential(3)})`);
+
+    const GG = G(x.z0, x.R, x.m);
+    if (!(GG > 0)) reasons.push(`G(z0,R,m) is nonpositive (check m,z0,R)`);
+
+    return reasons;
+  }
+
+  function isFeasible(x, C){
+    return feasibilityReasons(x,C).length === 0;
+  }
+
+  function objective(x, kind, weights){
+    const rho = rhoReq(x);
+    const P = rho * volume(x) / Math.max(1e-15,x.tau);
+    const V = volume(x);
+    if (kind === "minPin") return P;
+    if (kind === "minRho") return rho;
+
+    const wP = weights.wP, wR = weights.wR, wV = weights.wV;
+    return wP*Math.log(Math.max(1e-30,P)) + wR*Math.log(Math.max(1e-30,rho)) + wV*Math.log(Math.max(1e-30,V));
+  }
+
+  function linspace(a,b,n){
+    if(n<=1) return [a];
+    const out = [];
+    for(let i=0;i<n;i++) out.push(a + (b-a)*i/(n-1));
+    return out;
+  }
+  function randUniform(a,b){ return a + Math.random()*(b-a); }
+
+  function gridSettings(preset){
+    if(preset==="fast") return {gridR:26, gridZ:26, gridM:18, gridH:14};
+    if(preset==="deep") return {gridR:60, gridZ:60, gridM:40, gridH:24};
+    return {gridR:40, gridZ:40, gridM:30, gridH:20}; // med
+  }
+
+  function constrainedMinimize(bounds, C, objectiveType, weights, preset, randIters){
+    const gset = gridSettings(preset);
+    let best = null;
+    let bestJ = Infinity;
+
+    const Rs = linspace(bounds.Rmin, bounds.Rmax, gset.gridR);
+    const zs = linspace(bounds.z0min, bounds.z0max, gset.gridZ);
+    const ms = linspace(bounds.mmin, bounds.mmax, gset.gridM);
+    const hs = linspace(bounds.hmin, bounds.hmax, gset.gridH);
+
+    for (const R of Rs){
+      for (const z0 of zs){
+        if (z0 < C.zClear) continue;
+        for (const m of ms){
+          for (const h of hs){
+            const x = {
+              R, z0, m, h,
+              eta: bounds.etaFixed,
+              lam: bounds.lamFixed,
+              beta: bounds.betaFixed,
+              tau: bounds.tauFixed
+            };
+            if (!isFeasible(x,C)) continue;
+            const J = objective(x, objectiveType, weights);
+            if (J < bestJ){
+              bestJ = J;
+              best = {...x};
+            }
+          }
+        }
+      }
+    }
+
+    // Random refine
+    const iters = Math.max(0, Math.floor(randIters));
+    for (let i=0;i<iters;i++){
+      const x = {
+        R:  randUniform(bounds.Rmin, bounds.Rmax),
+        z0: randUniform(Math.max(bounds.z0min, C.zClear), bounds.z0max),
+        m:  randUniform(bounds.mmin, bounds.mmax),
+        h:  randUniform(bounds.hmin, bounds.hmax),
+        eta: bounds.etaFixed,
+        lam: bounds.lamFixed,
+        beta: bounds.betaFixed,
+        tau: bounds.tauFixed
+      };
+      if (!isFeasible(x,C)) continue;
+      const J = objective(x, objectiveType, weights);
+      if (J < bestJ){
+        bestJ = J;
+        best = {...x};
+      }
+    }
+
+    if (best){
+      best.G = G(best.z0,best.R,best.m);
+      best.rho = rhoReq(best);
+      best.V = volume(best);
+      best.A = area(best);
+      best.P = pin(best);
+      best.J = bestJ;
+    }
+    return best;
+  }
+
+  function drawMap(ctx, Rm, profile){
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    const img = ctx.createImageData(w,h);
+    const cx = w/2, cy = h/2;
+    const span = 2.2*Rm;            // show square width = 2.2R
+    const pxToM = span / w;
+    const sigma = 0.35*Rm;
+
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const dx = (x-cx)*pxToM;
+        const dy = (y-cy)*pxToM;
+        const r = Math.sqrt(dx*dx+dy*dy);
+        let val = 0;
+        if(profile==="uniform"){
+          val = (r<=Rm) ? 1 : 0;
+        }else{
+          val = (r<=Rm) ? Math.exp(-(r*r)/(2*sigma*sigma)) : 0;
+        }
+        const i = (y*w + x)*4;
+        const c = Math.floor(255*val);
+        img.data[i+0]=c;
+        img.data[i+1]=c;
+        img.data[i+2]=c;
+        img.data[i+3]=255;
+      }
+    }
+    ctx.putImageData(img,0,0);
+
+    // radius marker
+    ctx.strokeStyle="rgba(203,213,225,.9)";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    const Rp = Rm/pxToM;
+    ctx.arc(cx,cy,Rp,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  function drawPlot(ctx, x){
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    // axes
+    ctx.strokeStyle="rgba(203,213,225,.55)";
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(60,30); ctx.lineTo(60,h-50); ctx.lineTo(w-25,h-50);
+    ctx.stroke();
+
+    const zMax = Math.max(0.5, 2.0*x.R);
+    const zMin = 0.01;
+    const N = 240;
+
+    const rho = rhoReq(x); // choose rho so that a(z0)=g
+    let vmax = 0;
+    const vals = [];
+    for(let i=0;i<N;i++){
+      const z = zMin + (zMax-zMin)*(i/(N-1));
+      const GG = G(z, x.R, x.m);
+      const dzchi = x.lam * rho * x.h * GG;
+      const az = x.beta * x.eta * dzchi;
+      vmax = Math.max(vmax, az);
+      vals.push({z,az});
+    }
+    vmax = Math.max(vmax, 1e-12);
+
+    // line
+    ctx.strokeStyle="rgba(59,130,246,.95)";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    for(let i=0;i<N;i++){
+      const px = 60 + (w-85)*(vals[i].z - zMin)/(zMax-zMin);
+      const py = (h-50) - (h-90)*(vals[i].az / vmax);
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // g line
+    const gy = (h-50) - (h-90)*(g / vmax);
+    if (g < vmax){
+      ctx.setLineDash([6,6]);
+      ctx.strokeStyle="rgba(16,185,129,.9)";
+      ctx.beginPath(); ctx.moveTo(60,gy); ctx.lineTo(w-25,gy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle="rgba(16,185,129,.95)";
+      ctx.font="12px system-ui";
+      ctx.fillText("g", 66, gy-6);
+    }
+
+    // z0 marker
+    const xz0 = 60 + (w-85)*(x.z0 - zMin)/(zMax-zMin);
+    ctx.strokeStyle="rgba(245,158,11,.9)";
+    ctx.beginPath(); ctx.moveTo(xz0,30); ctx.lineTo(xz0,h-50); ctx.stroke();
+    ctx.fillStyle="rgba(245,158,11,.95)";
+    ctx.fillText("z0", xz0+4, 44);
+
+    // labels
+    ctx.fillStyle="rgba(203,213,225,.9)";
+    ctx.font="13px system-ui";
+    ctx.fillText("z (m)", w/2, h-14);
+    ctx.save();
+    ctx.translate(18,h/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText("a_z(z) (scaled)", 0, 0);
+    ctx.restore();
+
+    ctx.font="12px ui-monospace, monospace";
+    ctx.fillStyle="rgba(203,213,225,.9)";
+    ctx.fillText(`max a_z ≈ ${vmax.toExponential(2)} m/s²`, 70, 44);
+  }
+
+  function updateFeasibility(x){
+    const C = currentConstraints();
+    const reasons = feasibilityReasons(x,C);
+    const ok = reasons.length===0;
+
+    el("feasTxt").textContent = ok ? "FEASIBLE" : "INFEASIBLE";
+    const dot = el("dotFeas");
+    dot.className = "dot " + (ok ? "good" : "bad");
+
+    el("whyTxt").textContent = ok ? "All active constraints satisfied." : reasons.map(r => "- " + r).join("\n");
+  }
+
+  function update(){
+    const x = currentX();
+    const profile = el("profile").value;
+
+    el("R_v").textContent = fmt(x.R,2);
+    el("h_v").textContent = fmt(x.h,3);
+    el("z0_v").textContent = fmt(x.z0,2);
+    el("m_v").textContent = fmt(x.m,2);
+    el("eta_v").textContent = fmt(x.eta,2);
+    el("lam_v").textContent = fmt(x.lam,3);
+    el("beta_v").textContent = fmt(x.beta,3);
+    el("tau_v").textContent = fmt(x.tau,2);
+
+    const GG = G(x.z0,x.R,x.m);
+    const rho = rhoReq(x);
+    const V = volume(x);
+    const P = rho*V/Math.max(1e-15,x.tau);
+
+    el("G_v").textContent = fmt(GG,6);
+    el("rho_v").textContent = fmtAuto(rho);
+    el("V_v").textContent = V.toExponential(3);
+    el("P_v").textContent = fmtAuto(P);
+
+    updateFeasibility(x);
+
+    // draw
+    drawMap(el("map").getContext("2d"), x.R, profile);
+    drawPlot(el("plot").getContext("2d"), x);
+  }
+
+  function applyX(best){
+    el("R").value = best.R.toFixed(2);
+    el("h").value = best.h.toFixed(3);
+    el("z0").value = best.z0.toFixed(2);
+    el("m").value = best.m.toFixed(2);
+    // eta/lam/beta/tau are treated as "hardware fixed" = current slider values
+    update();
+  }
+
+  function runOpt(apply){
+    const C = currentConstraints();
+    const cur = currentX();
+
+    const bounds = {
+      // decision-variable bounds (match slider bounds)
+      Rmin:0.05, Rmax:2.0,
+      hmin:0.001, hmax:0.20,
+      z0min:0.01, z0max:2.0,
+      mmin:0.0,  mmax:10.0,
+
+      // treat these as fixed hardware parameters (from current sliders)
+      etaFixed:cur.eta,
+      lamFixed:cur.lam,
+      betaFixed:cur.beta,
+      tauFixed:cur.tau
+    };
+
+    const objectiveType = el("obj").value;
+    const weights = {
+      wP: parseFloat(el("wP").value),
+      wR: parseFloat(el("wR").value),
+      wV: parseFloat(el("wV").value),
+    };
+    const preset = el("gridPreset").value;
+    const randIters = parseFloat(el("randIters").value);
+
+    // Basic sanity: if constraints impossible with given caps, still try but report.
+    const best = constrainedMinimize(bounds, C, objectiveType, weights, preset, randIters);
+
+    const dot = el("dotBest");
+    if (!best){
+      dot.className = "dot bad";
+      el("bestTxt").textContent = "NONE";
+      el("bestMono").textContent =
+        "No feasible design found under current constraints.\n" +
+        "Try increasing A_max/V_max, relaxing P_max or rho_max, or lowering z_clear.\n" +
+        "Also try 'Deep' grid or more random iterations.";
+      return;
+    }
+
+    dot.className = "dot good";
+    el("bestTxt").textContent = "FOUND";
+
+    el("bestMono").textContent =
+      `R=${best.R.toFixed(3)} m, h=${best.h.toFixed(4)} m, z0=${best.z0.toFixed(3)} m, m=${best.m.toFixed(3)} 1/m\n` +
+      `G=${best.G.toExponential(3)}\n` +
+      `rho_req=${best.rho.toExponential(3)} J/m^3\n` +
+      `A=πR^2=${best.A.toExponential(3)} m^2, V=πR^2h=${best.V.toExponential(3)} m^3\n` +
+      `Pin=${best.P.toExponential(3)} W\n` +
+      `Objective J=${Number.isFinite(best.J)? best.J.toExponential(3): best.J}`;
+
+    if (apply) applyX(best);
+  }
+
+  function resetDefaults(){
+    el("R").value=0.25;
+    el("h").value=0.02;
+    el("z0").value=0.10;
+    el("m").value=1.00;
+    el("eta").value=0.65;
+    el("lam").value=1.000;
+    el("beta").value=0.100;
+    el("tau").value=1.00;
+
+    el("zClear").value=0.05;
+    el("Amax").value=2.00;
+    el("Vmax").value=0.05;
+    el("Pmax").value=1e9;
+    el("rhomax").value=1e12;
+    el("useCaps").value="yes";
+
+    el("obj").value="minPin";
+    el("randIters").value=30000;
+    el("wP").value=1.0;
+    el("wR").value=0.0;
+    el("wV").value=0.0;
+    el("gridPreset").value="med";
+    el("profile").value="uniform";
+    update();
+
+    el("dotBest").className="dot";
+    el("bestTxt").textContent="—";
+    el("bestMono").textContent="—";
+  }
+
+  // Wire events
+  ["R","h","z0","m","eta","lam","beta","tau","profile","zClear","Amax","Vmax","Pmax","rhomax","useCaps"].forEach(id=>{
+    el(id).addEventListener("input", update);
+    el(id).addEventListener("change", update);
+  });
+
+  el("optApply").addEventListener("click", ()=>runOpt(true));
+  el("optOnly").addEventListener("click", ()=>runOpt(false));
+  el("reset").addEventListener("click", resetDefaults);
+
+  // init
+  update();
+})();
+</script>
+</body>
+</html>
